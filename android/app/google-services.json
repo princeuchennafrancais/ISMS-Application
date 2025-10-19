@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "246868247427",
+    "project_id": "isms-477d1",
+    "storage_bucket": "isms-477d1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246868247427:android:02185d44eff5b973d9acb6",
+        "android_client_info": {
+          "package_name": "com.example.isms"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCG4Xt653Hcotat13YdPcKIEB5k1ypisqE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246868247427:android:070c2b22a7131830d9acb6",
+        "android_client_info": {
+          "package_name": "com.isms.wallet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCG4Xt653Hcotat13YdPcKIEB5k1ypisqE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
