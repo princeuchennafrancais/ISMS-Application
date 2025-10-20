@@ -838,7 +838,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                         // Action Buttons
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 40.h),
+                          padding: EdgeInsets.only(left: 20.w, right: 20.w, top: 140.h, bottom: 50.h),
                           child: ActionsButtonsLists(loginResponseModel: widget.loginResponse),
                         ),
 
@@ -846,7 +846,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                         // Transaction History Section
                         Padding(
-                          padding: EdgeInsets.only(top: 0.h, left: 25.w, right: 25.w),
+                          padding: EdgeInsets.only(top: 0.h, left: 30.w, right: 30.w),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1010,6 +1010,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   isLoadingBalance: isLoadingBalance,
                   balanceError: balanceError,
                   onRefreshBalance: refreshBalance,
+                  loginResponseModel: widget.loginResponse,
                 ),
               ],
             ),

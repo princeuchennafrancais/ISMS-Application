@@ -6,6 +6,7 @@ import 'package:wallet/core/utils/widget_utils/actions_button.dart';
 import 'package:wallet/feautures/presentation/home/payment_screen.dart';
 import 'package:wallet/feautures/presentation/home/withdraw_from_wallet.dart';
 
+import '../../../feautures/presentation/home/notification_screen.dart';
 import '../../../feautures/presentation/home/student_result_screen.dart';
 
 class ActionsButtonsLists extends StatefulWidget {
@@ -77,18 +78,15 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
           ),
           GestureDetector(
             child: ActionsButton(
-              image: "assets/icons/Vectorthing.png",
-              label: "Withdraw",
+              image: "assets/icons/images-removebg-preview.png",
+              label: "News Letter",
             ),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => WithdrawFromWallet(
-                    loginResponse: lrgm,
-                    scaffoldKey: GlobalKey<ScaffoldState>(),
-                  ),
-                ),
+                  builder: (context) => NotificationScreen(),
+                )
               );
             },
           ),

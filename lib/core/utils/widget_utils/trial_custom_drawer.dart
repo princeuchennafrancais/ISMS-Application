@@ -243,7 +243,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
                       children: [
                         SizedBox(height: 20.h),
                         _buildMenuItems(userData),
-                        const Spacer(),
+                        SizedBox(height: 90.h),
                         _buildFooter(userData),
                         SizedBox(height: 20.h),
                       ],
@@ -500,10 +500,10 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: AppColors.primaryBlue.withOpacity(0.05),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
-          color: AppColors.primaryBlue.withOpacity(0.1),
+          color: Colors.transparent,
         ),
       ),
       child: Column(

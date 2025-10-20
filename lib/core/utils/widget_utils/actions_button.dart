@@ -44,6 +44,7 @@ class ActionsButton extends StatelessWidget {
               Container(
                 width: 60.w,
                 height: 60.h,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -65,8 +66,8 @@ class ActionsButton extends StatelessWidget {
                 child: Center(
                   child: Image.asset(
                     image,
-                    height: 24.h,
-                    width: 24.w,
+                    height: 28.h,
+                    width: 28.w,
                     fit: BoxFit.contain,
                   ),
                 ),

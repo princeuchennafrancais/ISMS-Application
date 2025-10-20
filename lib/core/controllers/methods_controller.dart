@@ -122,7 +122,7 @@ class AuthController extends GetxController {
 
         final responseData = jsonDecode(cleanedResponse);
 
-        // FIX: Access the payload first, then check status
+        // Access the payload first, then check status
         final payload = responseData['payload'];
         if (payload != null && payload['status'] == 1) {
           // Create login response model from the payload data
@@ -142,51 +142,40 @@ class AuthController extends GetxController {
 
           print(loginResponseModel.data);
 
-          // Check device token status from payload
-          if (payload['is_device_token'] == true) {
-            print("📱 Device token not registered on backend, attempting to send...");
+          // Always send device token to backend after successful login
+          print("📱 Attempting to send device token to backend...");
 
-            // Get FCM token using TokenService (which has fallback to Firebase)
-            String? fcmToken = await TokenService().getFCMToken();
-            final authToken = token; // Use the token we just received
+          // Get FCM token using TokenService (which has fallback to Firebase)
+          String? fcmToken = await TokenService().getFCMToken();
+          final authToken = token; // Use the token we just received
 
-            if (fcmToken != null && fcmToken.isNotEmpty && authToken.isNotEmpty) {
-              print("📤 Sending device token to backend...");
-              print("   FCM Token: $fcmToken");
-              print("   Auth Token: ${authToken.substring(0, 20)}...");
+          if (fcmToken != null && fcmToken.isNotEmpty && authToken.isNotEmpty) {
+            print("📤 Sending device token to backend...");
+            print("   FCM Token: $fcmToken");
+            print("   Auth Token: ${authToken.substring(0, 20)}...");
 
-              try {
-                await sendTokenToBackend(fcmToken, authToken);
-                print("✅ Device token sent successfully");
-              } catch (e) {
-                print("❌ Error sending device token: $e");
-                // Don't block login if token send fails
-              }
-            } else {
-              print("⚠️ Warning: Unable to send device token");
-              print("   FCM Token: ${fcmToken ?? 'null'}");
-              print("   Auth Token: ${authToken.isNotEmpty ? 'available' : 'null'}");
-              print("   This might happen if:");
-              print("   1. Firebase is not properly initialized");
-              print("   2. User denied notification permissions");
-              print("   3. App is running on an emulator without Google Play Services");
+            try {
+              await sendTokenToBackend(fcmToken, authToken);
+              print("✅ Device token sent successfully");
+            } catch (e) {
+              print("❌ Error sending device token: $e");
+              // Don't block login if token send fails
             }
           } else {
-            print("✅ Device token already registered on backend");
+            print("⚠️ Warning: Unable to send device token");
+            print("   FCM Token: ${fcmToken ?? 'null'}");
+            print("   Auth Token: ${authToken.isNotEmpty ? 'available' : 'null'}");
+            print("   This might happen if:");
+            print("   1. Firebase is not properly initialized");
+            print("   2. User denied notification permissions");
+            print("   3. App is running on an emulator without Google Play Services");
           }
 
           // Navigate based on wallet status from payload
-          if (payload['has_wallet'] == false) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => CreateWallet(loginResponse: loginResponseModel)),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => IndexScreen(loginResponse: loginResponseModel)),
-            );
-          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => IndexScreen(loginResponse: loginResponseModel)),
+          );
         } else {
           // Handle error from payload or if payload is null
           print("❌ Login failed: Invalid payload or status");
@@ -223,7 +212,6 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-
 // Add this helper method to ensure school code is initialized
   Future<void> _ensureSchoolCodeInitialized() async {
     if (schoolCode.isEmpty) {

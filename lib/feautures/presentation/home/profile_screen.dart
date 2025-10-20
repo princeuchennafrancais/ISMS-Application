@@ -272,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 borderRadius: BorderRadius.circular(12.r),
               ),
               child: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
+                icon: Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -393,7 +393,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     String baseUrl = "https://api.ceemact.com/";
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(30.w),
+      padding: EdgeInsets.all(15.w),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -425,8 +425,8 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               ],
             ),
             child: Container(
-              height: 140.h,
-              width: 140.w,
+              height: 105.h,
+              width: 105.w,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,

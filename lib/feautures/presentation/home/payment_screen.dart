@@ -10,13 +10,12 @@ import 'package:wallet/core/enum/navigation_source.dart';
 
 class PaymentScreen extends StatefulWidget {
   final LoginResponseModel loginResponseModel;
-  final NavigationSource
-  navigationSource; // Optional parameter to track navigation source
+  final NavigationSource navigationSource;
 
   const PaymentScreen({
     super.key,
     required this.loginResponseModel,
-    this.navigationSource = NavigationSource.other, // Default value
+    this.navigationSource = NavigationSource.other,
   });
 
   @override
@@ -28,31 +27,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final TextEditingController _remarkController = TextEditingController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Predefined amount values
   final List<int> predefinedAmounts = [200, 300, 500, 1000, 2000, 3000];
-
   bool _showAmountLabel = true;
 
   @override
   void initState() {
     super.initState();
-    // Add listener to track when the amount field is empty
     _amountController.addListener(_updateAmountLabelVisibility);
-
-    // Handle different navigation sources
     _handleNavigationSource();
   }
 
-  // Handle behavior based on navigation source
   void _handleNavigationSource() {
     switch (widget.navigationSource) {
       case NavigationSource.button:
         print("🔘 Navigated via Button - Show special behavior");
-        // You can show a welcome message, analytics, etc.
         break;
       case NavigationSource.bottomBar:
         print("📱 Navigated via Bottom Bar - Standard navigation");
-        // Standard behavior for bottom bar navigation
         break;
       case NavigationSource.drawer:
         print("📋 Navigated via Drawer - Menu navigation");
@@ -65,7 +56,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  // Show a message based on navigation source
   void _showNavigationMessage(String message) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -80,7 +70,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
   }
 
-  // Separate method for updating amount label visibility
   void _updateAmountLabelVisibility() {
     if (mounted) {
       setState(() {
@@ -91,14 +80,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
-    // Remove listeners first to prevent callback on disposed state
     _amountController.removeListener(_updateAmountLabelVisibility);
     _amountController.dispose();
     _remarkController.dispose();
     super.dispose();
   }
 
-  // Update amount when predefined button is pressed
   void _setAmount(int amount) {
     _amountController.text = amount.toString();
   }
@@ -115,75 +102,357 @@ class _PaymentScreenState extends State<PaymentScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: _buildAppBarLeading(),
+        centerTitle: true,
+        title: Text(
+          _getAppBarTitle(),
+          style: TextStyle(
+            color: AppColors.primaryBlue,
+            fontWeight: FontWeight.w600,
+            fontSize: 18.sp,
+          ),
+        ),
       ),
       drawer: TrialCustomDrawer(
         loginResponseModel: widget.loginResponseModel,
         profPic: userData?.fpicture ?? "asset/images/Student.png",
-        userName:
-            "${userData?.firstname} ${userData?.lastname}" ??
-            "Ikegou faith Sochima",
+        userName: "${userData?.firstname} ${userData?.lastname}" ?? "Ikegou faith Sochima",
         adno: userData?.adno ?? "RCN/2021/064",
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 29.h),
-          child: Center(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  "Make a Payment",
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 19.sp,
-                  ),
-                ),
-                SizedBox(height: 30.h),
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Section
+              _buildHeaderSection(),
+              SizedBox(height: 32.h),
 
-                // Amount Input Container
-                _buildAmountContainer(naira),
+              // Amount Section
+              _buildAmountSection(naira),
+              SizedBox(height: 24.h),
 
-                SizedBox(height: 30.h),
+              // Remark Section
+              _buildRemarkSection(),
+              SizedBox(height: 32.h),
 
-                // Remark Field Container
-                _buildRemarkContainer(),
-
-                SizedBox(height: 30.h),
-
-                // Continue Button
-                ElvButton(
-                  text: "Continue",
-                  onPressed: () {
-                    // Validate amount before navigating
-                    if (_validateAmount()) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => PaymentScanner(
-                                amount: _amountController.text,
-                                description: _remarkController.text,
-                                ResponseModel: widget.loginResponseModel,
-                              ),
-                        ),
-                      );
-                    } else {
-                      _showAmountError();
-                    }
-                  },
-                ),
-
-                SizedBox(height: 20.h),
-              ],
-            ),
+              // Continue Button - FIXED: Added constraints
+              SizedBox(
+                width: double.infinity,
+                child: _buildContinueButton(),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // Build appropriate app bar leading based on navigation source
+  Widget _buildHeaderSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Make a Payment",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+            fontSize: 28.sp,
+            height: 1.2,
+          ),
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          "Enter payment details to continue",
+          style: TextStyle(
+            color: Colors.black54,
+            fontWeight: FontWeight.w400,
+            fontSize: 14.sp,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmountSection(String naira) {
+    return Container(
+      padding: EdgeInsets.all(24.r),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey.shade100,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8.r),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.currency_exchange,
+                  color: AppColors.primaryBlue,
+                  size: 20.sp,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                "Amount",
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16.sp,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 20.h),
+
+          // Amount Input Field - FIXED: Better prefix icon alignment
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.lightGray.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: TextFormField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              cursorColor: AppColors.primaryBlue,
+              textInputAction: TextInputAction.done,
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+              decoration: InputDecoration(
+                prefixIcon: Container(
+                  width: 40.w,
+                  alignment: Alignment.center,
+                  child: Text(
+                    naira,
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                hintText: '50.00 - 100,000',
+                hintStyle: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 16.sp,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 16.h,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+
+          // Quick Amount Section
+          Text(
+            "Quick Amount",
+            style: TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w500,
+              fontSize: 14.sp,
+            ),
+          ),
+          SizedBox(height: 12.h),
+
+          // Predefined Amount Buttons - FIXED: Using Wrap instead of GridView
+          _buildAmountButtonGrid(naira),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountButtonGrid(String naira) {
+    return Wrap(
+      spacing: 12.w,
+      runSpacing: 12.h,
+      children: predefinedAmounts.map((amount) {
+        return GestureDetector(
+          onTap: () => _setAmount(amount),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                color: AppColors.primaryBlue.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              '$naira$amount',
+              style: TextStyle(
+                color: AppColors.primaryBlue,
+                fontWeight: FontWeight.w600,
+                fontSize: 14.sp,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRemarkSection() {
+    return Container(
+      padding: EdgeInsets.all(24.r),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey.shade100,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8.r),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.note_alt_outlined,
+                  color: Colors.orange,
+                  size: 20.sp,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                "Remark",
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16.sp,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 20.h),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.lightGray.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: TextFormField(
+              controller: _remarkController,
+              textInputAction: TextInputAction.done,
+              cursorColor: AppColors.primaryBlue,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 16.sp,
+                color: Colors.black87,
+              ),
+              decoration: InputDecoration(
+                hintText: "What's this for? (optional)",
+                hintStyle: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 14.sp,
+                ),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 16.h,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContinueButton() {
+    return Container(
+      height: 56.h,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryBlue,
+            AppColors.primaryBlue.withOpacity(0.8),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryBlue.withOpacity(0.3),
+            blurRadius: 15,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: () {
+          if (_validateAmount()) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PaymentScanner(
+                  amount: _amountController.text,
+                  description: _remarkController.text,
+                  ResponseModel: widget.loginResponseModel,
+                ),
+              ),
+            );
+          } else {
+            _showAmountError();
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+        ),
+        child: Text(
+          "Continue",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 16.sp,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAppBarLeading() {
     switch (widget.navigationSource) {
       case NavigationSource.bottomBar:
@@ -206,7 +475,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  // Get appropriate app bar title based on navigation source
   String _getAppBarTitle() {
     switch (widget.navigationSource) {
       case NavigationSource.button:
@@ -221,174 +489,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  // Handle back navigation based on source
-  void _handleBackNavigation() {
-    switch (widget.navigationSource) {
-      case NavigationSource.button:
-      case NavigationSource.drawer:
-        // Go back to home for button/drawer navigation
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-          (route) => false,
-          arguments: widget.loginResponseModel,
-        );
-        break;
-      case NavigationSource.bottomBar:
-        // Just pop for bottom bar navigation (likely going back to the same screen with bottom bar)
-        Navigator.pop(context);
-        break;
-      case NavigationSource.other:
-      default:
-        Navigator.pop(context);
-        break;
-    }
-  }
-
-  // Amount Container Widget
-  Widget _buildAmountContainer(String naira) {
-    return Container(
-      alignment: Alignment.center,
-      padding: EdgeInsets.all(22.r),
-      decoration: BoxDecoration(
-        color: AppColors.lightGray,
-        borderRadius: BorderRadius.circular(10.r),
-      ),
-      width: 380.w,
-      constraints: BoxConstraints(minHeight: 265.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Amount",
-            style: TextStyle(
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-              fontSize: 18.sp,
-              fontFamily: "Poppins",
-            ),
-          ),
-          SizedBox(height: 10.h),
-          TextFormField(
-            controller: _amountController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            cursorColor: AppColors.primaryBlue,
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              prefixIcon: Padding(
-                padding: EdgeInsets.all(12.r),
-                child: Text(naira, style: TextStyle(fontSize: 18.sp)),
-              ),
-              labelText: _showAmountLabel ? '50.00 - 100,000' : null,
-              labelStyle: const TextStyle(color: Colors.black54),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primaryBlue),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primaryBlue, width: 2),
-              ),
-              filled: false,
-            ),
-          ),
-          SizedBox(height: 20.h),
-
-          // Predefined Amount Buttons
-          _buildAmountButtonGrid(naira),
-        ],
-      ),
-    );
-  }
-
-  // Grid of Predefined Amount Buttons
-  Widget _buildAmountButtonGrid(String naira) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: predefinedAmounts.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10.h,
-        crossAxisSpacing: 10.w,
-        childAspectRatio: 2.5,
-      ),
-      itemBuilder: (context, index) {
-        return ElevatedButton(
-          onPressed: () => _setAmount(predefinedAmounts[index]),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryBlue,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-          ),
-          child: Text(
-            '$naira${predefinedAmounts[index]}',
-            style: TextStyle(color: Colors.white, fontSize: 14.sp),
-          ),
-        );
-      },
-    );
-  }
-
-  // Remark Container Widget
-  Widget _buildRemarkContainer() {
-    return Container(
-      alignment: Alignment.center,
-      padding: EdgeInsets.all(22.r),
-      decoration: BoxDecoration(
-        color: AppColors.lightGray,
-        borderRadius: BorderRadius.circular(10.r),
-      ),
-      width: 380.w,
-      constraints: BoxConstraints(minHeight: 140.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Remark",
-            style: TextStyle(
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-              fontSize: 18.sp,
-              fontFamily: "Poppins",
-            ),
-          ),
-          TextFormField(
-            controller: _remarkController,
-            textInputAction: TextInputAction.done,
-            cursorColor: AppColors.primaryBlue,
-            decoration: InputDecoration(
-              labelText: "What's this for? (optional)",
-              labelStyle: TextStyle(fontSize: 14.sp),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primaryBlue),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primaryBlue, width: 2),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Validate amount before proceeding
   bool _validateAmount() {
     if (_amountController.text.isEmpty) {
       return false;
     }
-
     final amount = int.tryParse(_amountController.text) ?? 0;
     return amount >= 5 && amount <= 100000;
   }
 
-  // Show error message for invalid amount
   void _showAmountError() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text('Please enter an amount between ₦5 and ₦100,000'),
         backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.r),
+        ),
       ),
     );
   }

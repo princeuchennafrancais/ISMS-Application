@@ -5,6 +5,7 @@ import 'package:wallet/core/controllers/api_endpoints.dart';
 import 'package:wallet/core/models/login_model.dart';
 import 'package:wallet/core/utils/color_utils/color_util.dart';
 import 'package:wallet/core/utils/widget_utils/trial_custom_drawer.dart';
+import 'package:wallet/feautures/auth/create_wallet.dart';
 import 'package:wallet/feautures/presentation/home/withdraw_successful.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -1235,6 +1236,267 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
     );
   }
 
+  Widget _buildNoWalletScreen() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(30.r),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated wallet icon
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: Duration(milliseconds: 800),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    padding: EdgeInsets.all(40.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primaryBlue.withOpacity(0.1),
+                          AppColors.primaryBlue.withOpacity(0.05),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primaryBlue.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 80.sp,
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            SizedBox(height: 40.h),
+
+            // Title
+            Text(
+              'Wallet Not Found',
+              style: TextStyle(
+                fontSize: 28.sp,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+                fontFamily: 'Poppins',
+                letterSpacing: -0.5,
+              ),
+            ),
+
+            SizedBox(height: 12.h),
+
+            // Description
+            Text(
+              'You need to create a wallet before you can make withdrawals',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16.sp,
+                color: Colors.grey.shade600,
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+            ),
+
+            SizedBox(height: 40.h),
+
+            // Benefits section
+            Container(
+              padding: EdgeInsets.all(24.r),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: Colors.grey.shade200,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'What you can do with a wallet:',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  _buildBenefitItem(
+                    icon: Icons.payments_outlined,
+                    title: 'Receive Payments',
+                    description: 'Get money from school & parents',
+                  ),
+                  _buildBenefitItem(
+                    icon: Icons.send_rounded,
+                    title: 'Make Withdrawals',
+                    description: 'Transfer funds to your bank account',
+                  ),
+                  _buildBenefitItem(
+                    icon: Icons.history_rounded,
+                    title: 'Track Transactions',
+                    description: 'View all your payment history',
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 40.h),
+
+            // Create Wallet Button
+            Container(
+              width: double.infinity,
+              height: 60.h,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16.r),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryBlue,
+                    AppColors.primaryBlue.withOpacity(0.8),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryBlue.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context)=> CreateWallet(loginResponse: widget.loginResponse)));
+                  },
+                  borderRadius: BorderRadius.circular(16.r),
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_card_rounded,
+                          color: Colors.white,
+                          size: 24.sp,
+                        ),
+                        SizedBox(width: 12.w),
+                        Text(
+                          'Create Wallet Now',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(height: 16.h),
+
+            // Back button
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.grey.shade600,
+                    size: 20.sp,
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Go Back',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBenefitItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(10.w),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primaryBlue,
+              size: 22.sp,
+            ),
+          ),
+          SizedBox(width: 14.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    color: Colors.grey.shade600,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userData = widget.loginResponse.data;
@@ -1304,6 +1566,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
       ),
     );
   }
+
 
   Widget _buildAppBarLeading() {
     switch (widget.navigationSource) {
@@ -1499,53 +1762,69 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
 
   Widget _buildHeaderSection() {
     return Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(20.r),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 10,
-              offset: Offset(0, 2),
-            ),
+      width: double.infinity,
+      padding: EdgeInsets.all(24.r),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.grey.shade50,
           ],
         ),
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(16.r),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.1),
-                shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 15,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(20.r),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primaryBlue.withOpacity(0.15),
+                  AppColors.primaryBlue.withOpacity(0.08),
+                ],
               ),
-              child: Icon(
-                Icons.send_rounded,
-                color: AppColors.primaryBlue,
-                size: 32.sp,
-              ),
+              shape: BoxShape.circle,
             ),
-            SizedBox(height: 12.h),
-            Text(
-              'Withdraw to Bank Account',
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+            child: Icon(
+              Icons.send_rounded,
+              color: AppColors.primaryBlue,
+              size: 36.sp,
             ),
-            SizedBox(height: 6.h),
-            Text(
-              'Enter the account details below to withdraw funds',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: Colors.grey.shade600,
-              ),
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'Withdraw to Bank Account',
+            style: TextStyle(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w800,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+              letterSpacing: -0.5,
             ),
-          ],
-        )
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Transfer funds securely to any Nigerian bank',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: Colors.grey.shade600,
+              fontFamily: 'Poppins',
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
   Widget _buildSecurityBadges() {
@@ -1691,13 +1970,14 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
 
               _buildContinueButton(),
 
-              SizedBox(height: 30.h),
+              SizedBox(height: 70.h),
             ],
           ),
         ),
       ),
     );
   }
+
 
   Widget _buildSectionHeader() {
     return Column(

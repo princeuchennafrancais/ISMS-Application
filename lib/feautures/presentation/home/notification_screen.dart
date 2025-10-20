@@ -524,7 +524,7 @@ class _NotificationScreenState extends State<NotificationScreen> with TickerProv
                 borderRadius: BorderRadius.circular(12.r),
               ),
               child: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
+                icon: Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
                 onPressed: () => Navigator.pop(context),
               ),
             ),

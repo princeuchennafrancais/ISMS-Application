@@ -84,7 +84,7 @@ class _HeaderSectionState extends State<HeaderSection> with TickerProviderStateM
 
     return Container(
       width: double.infinity,
-      height: 255.h,
+      height: 235.h,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
