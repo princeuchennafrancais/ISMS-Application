@@ -6,7 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:pinput/pinput.dart'; // Add this package
+import 'package:pinput/pinput.dart';
 
 // Import your services
 import '../../core/controllers/school_service.dart';
@@ -212,6 +212,8 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
       final String? logoUrl = schoolData['logo']?.toString();
       final String? retrievedSchoolCode = schoolData['scode']?.toString();
       final int? schoolId = schoolData['id'];
+      final String? email = schoolData['email']?.toString();
+      final String? phone = schoolData['phone']?.toString();
 
       print('Extracted Data:');
       print('- School Name: $schoolName');
@@ -219,13 +221,15 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
       print('- Logo URL: $logoUrl');
       print('- School Code: $retrievedSchoolCode');
       print('- School ID: $schoolId');
+      print('- Email: $email');
+      print('- Phone: $phone');
 
       if (schoolName == null || colorHex == null || logoUrl == null) {
         print('✗ Missing required school data fields');
         throw Exception('Incomplete school data received');
       }
 
-      // Use SchoolDataService to save all data (including logo download)
+      // Use SchoolDataService to save all data (including logo download, email, and phone)
       print('Saving school data using SchoolDataService...');
       final bool saveSuccess = await SchoolDataService.saveSchoolData(
         schoolCode: retrievedSchoolCode ?? schoolCode,
@@ -233,6 +237,8 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
         colorHex: colorHex,
         logoUrl: logoUrl,
         schoolId: schoolId,
+        email: email,
+        phone: phone,
       );
 
       if (!saveSuccess) {

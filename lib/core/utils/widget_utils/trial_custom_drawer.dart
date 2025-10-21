@@ -4,6 +4,7 @@ import 'package:wallet/core/controllers/methods_controller.dart';
 import 'package:wallet/core/models/login_model.dart';
 import 'package:wallet/core/utils/color_utils/color_util.dart';
 import 'package:wallet/core/utils/widget_utils/school_logo.dart';
+import 'package:wallet/feautures/presentation/home/change_password.dart';
 import 'package:wallet/feautures/presentation/home/change_pin.dart';
 import 'package:wallet/feautures/presentation/home/notification_screen.dart';
 import 'package:wallet/feautures/presentation/home/profile_screen.dart';
@@ -243,7 +244,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
                       children: [
                         SizedBox(height: 20.h),
                         _buildMenuItems(userData),
-                        SizedBox(height: 90.h),
+                        SizedBox(height: 110.h),
                         _buildFooter(userData),
                         SizedBox(height: 20.h),
                       ],
@@ -395,17 +396,6 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
           );
         },
       },
-      if (userData.role == "student")
-        {
-          'icon': Icons.newspaper_rounded,
-          'title': 'Newsletters',
-          'onTap': () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => NotificationScreen()),
-            );
-          },
-        },
       {
         'icon': Icons.lock_outline_rounded,
         'title': 'Change Pin',
@@ -416,6 +406,17 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
           );
         },
       },
+        {
+          'icon': Icons.password,
+          'title': 'Change Password',
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ChangePassword(loginResponse: widget.loginResponseModel)),
+            );
+          },
+        },
+
       {
         'icon': Icons.logout_rounded,
         'title': 'Logout',

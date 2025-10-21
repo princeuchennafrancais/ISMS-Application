@@ -154,17 +154,10 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
       case NavigationSource.drawer:
       case NavigationSource.other:
       default:
-        return Container(
-          margin: EdgeInsets.all(8.w),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
-            onPressed: () => Navigator.pop(context),
-          ),
-        );
+        return IconButton(
+      icon: Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
+    onPressed: () => Navigator.pop(context),
+    );
     }
   }
 
@@ -711,7 +704,7 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
             ),
             SizedBox(height: 50.h),
             _buildFetchButton(),
-            SizedBox(height: 30.h),
+            SizedBox(height: 90.h),
           ],
         ),
       ),

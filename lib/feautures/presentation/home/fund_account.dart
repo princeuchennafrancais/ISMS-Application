@@ -387,7 +387,7 @@ class _FundAccountScreenState extends State<FundAccountScreen>
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: AppColors.primaryBlue, size: 20.sp),
+          icon: Icon(Icons.arrow_back, color: AppColors.primaryBlue, size: 20.sp),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(

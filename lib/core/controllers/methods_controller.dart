@@ -61,6 +61,8 @@ class AuthController extends GetxController {
     schoolCode = schoolData?.schoolCode ?? "";
   }
 
+
+
   Future<void> loginUser({
     required String userName,
     required String password,

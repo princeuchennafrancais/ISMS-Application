@@ -90,9 +90,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final schoolData = await SchoolDataService.getSchoolData();
     schoolCode = schoolData?.schoolCode ?? "";
 
-    // Now fetch both balance and transactions after school code is initialized
-    fetchWalletBalance();
-    fetchWalletTransactions();
+    // Only fetch balance and transactions if user has a wallet
+    if (widget.loginResponse.hasWallet ?? false) {
+      fetchWalletBalance();
+      fetchWalletTransactions();
+    } else {
+      // Set initial state for no wallet
+      setState(() {
+        isLoadingBalance = false;
+        isLoadingTransactions = false;
+      });
+    }
   }
 
   @override
@@ -752,52 +760,54 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget buildEmptyState() {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 60.h),
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(30.w),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primaryBlue.withOpacity(0.1),
-                    AppColors.primaryBlue.withOpacity(0.05),
-                  ],
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 60.h),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(30.w),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryBlue.withOpacity(0.1),
+                      AppColors.primaryBlue.withOpacity(0.05),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
                 ),
-                shape: BoxShape.circle,
+                child: Image.asset(
+                  "assets/icons/Group 9.png",
+                  width: 120.w,
+                  height: 120.h,
+                  fit: BoxFit.contain,
+                ),
               ),
-              child: Image.asset(
-                "assets/icons/Group 9.png",
-                width: 120.w,
-                height: 120.h,
-                fit: BoxFit.contain,
+              SizedBox(height: 24.h),
+              Text(
+                "No Transactions Yet",
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
               ),
-            ),
-            SizedBox(height: 24.h),
-            Text(
-              "No Transactions Yet",
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
+              SizedBox(height: 8.h),
+              Text(
+                "Your transaction history will appear here\nonce you start using your wallet",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14.sp,
+                  fontFamily: 'Poppins',
+                  height: 1.4,
+                ),
               ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              "Your transaction history will appear here\nonce you start using your wallet",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14.sp,
-                fontFamily: 'Poppins',
-                height: 1.4,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1011,6 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   balanceError: balanceError,
                   onRefreshBalance: refreshBalance,
                   loginResponseModel: widget.loginResponse,
+                  hasWallet: widget.loginResponse.hasWallet ?? true, // ✅ Added this line
                 ),
               ],
             ),

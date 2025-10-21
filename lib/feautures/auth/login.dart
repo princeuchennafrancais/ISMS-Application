@@ -6,6 +6,9 @@ import 'package:wallet/core/utils/color_utils/color_util.dart';
 import 'package:wallet/core/utils/widget_utils/auth_txt_field.dart';
 import 'package:wallet/core/utils/widget_utils/obscure_auth_textField.dart';
 import 'package:wallet/feautures/auth/contact_admin.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+import 'dart:io';
 
 import '../../core/utils/widget_utils/school_logo.dart';
 
@@ -23,6 +26,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
+  // Network monitoring
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  bool _hasInternet = true;
+  String _networkMessage = '';
+  late AnimationController _networkBannerController;
+  late Animation<Offset> _networkBannerSlideAnimation;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -31,6 +41,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+
+    // Main animation controller
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -44,12 +56,101 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       curve: Curves.easeOut,
     ));
 
+    // Network banner animation controller
+    _networkBannerController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _networkBannerSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _networkBannerController,
+      curve: Curves.easeOut,
+    ));
+
     _animationController.forward();
+
+    // Start monitoring network
+    _initNetworkMonitoring();
+  }
+
+  void _initNetworkMonitoring() {
+    // Initial check
+    _checkNetworkConnection();
+
+    // Listen to connectivity changes
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+          (List<ConnectivityResult> results) {
+        _checkNetworkConnection();
+      },
+    );
+  }
+
+  Future<void> _checkNetworkConnection() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+
+      // Check if there's any connection
+      final hasConnection = !connectivityResult.contains(ConnectivityResult.none);
+
+      if (!hasConnection) {
+        // No connection at all
+        _updateNetworkStatus(false, 'No internet connection');
+        return;
+      }
+
+      // Check actual internet connectivity (not just WiFi/mobile connection)
+      try {
+        final result = await InternetAddress.lookup('google.com')
+            .timeout(const Duration(seconds: 5));
+
+        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+          // Internet is available
+          _updateNetworkStatus(true, '');
+        } else {
+          _updateNetworkStatus(false, 'No internet connection');
+        }
+      } on SocketException catch (_) {
+        _updateNetworkStatus(false, 'No internet connection');
+      } on TimeoutException catch (_) {
+        _updateNetworkStatus(false, 'Slow or no internet connection');
+      }
+    } catch (e) {
+      print('Error checking network: $e');
+      _updateNetworkStatus(false, 'Unable to verify connection');
+    }
+  }
+
+  void _updateNetworkStatus(bool hasInternet, String message) {
+    if (!mounted) return;
+
+    setState(() {
+      _hasInternet = hasInternet;
+      _networkMessage = message;
+    });
+
+    if (!hasInternet) {
+      // Show banner
+      _networkBannerController.forward();
+    } else {
+      // Hide banner after a delay if connection restored
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && _hasInternet) {
+          _networkBannerController.reverse();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _networkBannerController.dispose();
+    _connectivitySubscription.cancel();
+    regNumber.dispose();
+    password.dispose();
     super.dispose();
   }
 
@@ -57,32 +158,157 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24.w),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(height: 120.h),
-                    _buildLogoSection(),
-                    SizedBox(height: 70.h),
-                    _buildWelcomeText(),
-                    SizedBox(height: 40.h),
-                    _buildLoginForm(context),
-                    SizedBox(height: 20.h),
-                    _buildForgotPassword(),
-                    SizedBox(height: 40.h),
-                    _buildFooter(),
-                    SizedBox(height: 30.h),
-                  ],
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(height: 120.h),
+                        _buildLogoSection(),
+                        SizedBox(height: 70.h),
+                        _buildWelcomeText(),
+                        SizedBox(height: 40.h),
+                        _buildLoginForm(context),
+                        SizedBox(height: 20.h),
+                        _buildForgotPassword(),
+                        SizedBox(height: 40.h),
+                        _buildFooter(),
+                        SizedBox(height: 30.h),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
+          ),
+
+          // Network status banner
+          _buildNetworkBanner(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNetworkBanner() {
+    if (_hasInternet) {
+      return SlideTransition(
+        position: _networkBannerSlideAnimation,
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.green.shade600,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.wifi_rounded,
+                  color: Colors.white,
+                  size: 20.sp,
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Text(
+                    'Connection restored',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 18.sp,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SlideTransition(
+      position: _networkBannerSlideAnimation,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        decoration: BoxDecoration(
+          color: Colors.red.shade600,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                color: Colors.white,
+                size: 20.sp,
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _networkMessage,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      'Please check your connection',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 11.sp,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white,
+                  size: 20.sp,
+                ),
+                onPressed: _checkNetworkConnection,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
         ),
       ),
@@ -225,10 +451,34 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             ],
           ),
           child: ElevatedButton(
-            onPressed: _isLoading
+            onPressed: (_isLoading || !_hasInternet)
                 ? null
                 : () async {
               if (_formKey.currentState!.validate()) {
+                // Check network before attempting login
+                await _checkNetworkConnection();
+
+                if (!_hasInternet) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.wifi_off, color: Colors.white),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Text('No internet connection. Please try again.'),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Colors.red.shade600,
+                      behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.all(16.w),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
+
                 setState(() => _isLoading = true);
 
                 final fcmToken = await TokenService().getFCMToken();
@@ -239,11 +489,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   fcmToken: fcmToken ?? "",
                   context: context,
                 );
-                setState(() => _isLoading = false);
+
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
+              backgroundColor: !_hasInternet
+                  ? Colors.grey.shade400
+                  : AppColors.primaryBlue,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -259,13 +514,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 strokeWidth: 2.5,
               ),
             )
-                : Text(
-              "Sign In",
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-                fontFamily: "Poppins",
-              ),
+                : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!_hasInternet) ...[
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 18.sp,
+                  ),
+                  SizedBox(width: 8.w),
+                ],
+                Text(
+                  !_hasInternet ? "No Connection" : "Sign In",
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: "Poppins",
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -299,22 +566,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildFooter() {
     return Column(
       children: [
-        // Container(
-        //   padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 20.w),
-        //   decoration: BoxDecoration(
-        //     color: AppColors.primaryBlue.withOpacity(0.05),
-        //     borderRadius: BorderRadius.circular(20.r),
-        //   ),
-        //   child: Text(
-        //     "Student & Vendor Portal",
-        //     style: TextStyle(
-        //       color: AppColors.primaryBlue.withOpacity(0.7),
-        //       fontSize: 12.sp,
-        //       fontFamily: 'Poppins',
-        //       fontWeight: FontWeight.w500,
-        //     ),
-        //   ),
-        // ),
         SizedBox(height: 20.h),
         Image.asset(
           "assets/images/Powered by.png",

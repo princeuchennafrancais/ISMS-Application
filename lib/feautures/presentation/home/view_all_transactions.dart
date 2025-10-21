@@ -653,7 +653,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
         foregroundColor: Colors.white,
         leading: GestureDetector(
-          child: Icon(Icons.arrow_back_ios, color: AppColors.primaryBlue,),
+          child: Icon(Icons.arrow_back, color: AppColors.primaryBlue,),
           onTap: () {
             Navigator.pop(context);
           },

@@ -77,6 +77,8 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  late final hasWallet = widget.loginResponse.hasWallet ?? false;
+
   List<Bank> banks = [];
   Bank? selectedBank;
   BankAccountDetails? accountDetails;
@@ -1269,7 +1271,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
                     ),
                     child: Icon(
                       Icons.account_balance_wallet_outlined,
-                      size: 80.sp,
+                      size: 50.sp,
                       color: AppColors.primaryBlue,
                     ),
                   ),
@@ -1281,7 +1283,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
 
             // Title
             Text(
-              'Wallet Not Found',
+              'No Active Wallet',
               style: TextStyle(
                 fontSize: 28.sp,
                 fontWeight: FontWeight.w800,
@@ -1295,7 +1297,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
 
             // Description
             Text(
-              'You need to create a wallet before you can make withdrawals',
+              'Activate Wallet',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16.sp,
@@ -1339,7 +1341,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
                   SizedBox(height: 20.h),
                   _buildBenefitItem(
                     icon: Icons.payments_outlined,
-                    title: 'Receive Payments',
+                    title: 'Make Payments',
                     description: 'Get money from school & parents',
                   ),
                   _buildBenefitItem(
@@ -1396,7 +1398,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
                         ),
                         SizedBox(width: 12.w),
                         Text(
-                          'Create Wallet Now',
+                          'Activate Wallet Now',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18.sp,
@@ -1548,7 +1550,9 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
             "Ikegou faith Sochima",
         adno: userData?.adno ?? "RCN/2021/064",
       ),
-      body: Stack(
+      body: !hasWallet
+          ? _buildNoWalletScreen() // Show no wallet screen
+          : Stack( // Show normal withdrawal form
         children: [
           FadeTransition(
             opacity: _fadeAnimation,

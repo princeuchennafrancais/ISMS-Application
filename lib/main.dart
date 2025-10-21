@@ -215,7 +215,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Updated App Initialization Logic with SchoolDataService
+
 class AppInitializer {
   static Future<Widget> getInitialScreen() async {
     try {
@@ -238,11 +238,11 @@ class AppInitializer {
           if (authToken != null && authToken.isNotEmpty) {
             // User is logged in and has school data, go to launch screen
             print('✓ User is logged in, going to launch screen');
-            return const LoginScreen();
+            return const Launch();  // ✅ FIXED - go to Launch
           } else {
             // User has school data but not logged in, go to login
             print('✓ User not logged in, going to login screen');
-            return const SchoolCodeScreen();
+            return const LoginScreen();  // ✅ FIXED - go to LoginScreen
           }
         } else {
           // School data exists but couldn't load it, go to school code screen

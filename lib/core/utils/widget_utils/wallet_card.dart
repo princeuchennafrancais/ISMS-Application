@@ -103,8 +103,8 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
   Widget _buildNoWalletState() {
     return Positioned(
       top: 200.h,
-      left: 40.w,
-      right: 40.w,
+      left: 35.w,
+      right: 35.w,
       child: SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -150,10 +150,10 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
               children: [
                 Icon(
                   Icons.account_balance_wallet_outlined,
-                  size: 64.sp,
+                  size: 42.sp,
                   color: AppColors.primaryBlue.withOpacity(0.3),
                 ),
-                SizedBox(height: 16.h),
+                SizedBox(height: 6.h),
                 Text(
                   "No Wallet Yet",
                   style: TextStyle(
@@ -163,9 +163,9 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
                     fontFamily: 'Poppins',
                   ),
                 ),
-                SizedBox(height: 8.h),
+                SizedBox(height: 7.h),
                 Text(
-                  "Activate your wallet to start managing\nyour funds seamlessly",
+                  "Click to Activate Wallet",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.sp,
@@ -175,7 +175,7 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
                     height: 1.4,
                   ),
                 ),
-                SizedBox(height: 24.h),
+                SizedBox(height: 10.h),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
