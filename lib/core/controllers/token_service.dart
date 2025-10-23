@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../models/login_model.dart';
 
 class TokenService {
   static final TokenService _instance = TokenService._internal();
@@ -8,6 +10,11 @@ class TokenService {
 
   static const String _fcmTokenKey = 'fcm_token';
   static const String _authTokenKey = 'auth_token';
+  static const String _loginResponseKey = 'login_response_data'; // NEW
+
+  // ============================================
+  // FCM TOKEN METHODS
+  // ============================================
 
   // Store FCM Token
   Future<void> storeFCMToken(String token) async {
@@ -63,6 +70,10 @@ class TokenService {
     }
   }
 
+  // ============================================
+  // AUTH TOKEN METHODS
+  // ============================================
+
   // Store Auth Token
   Future<void> storeAuthToken(String token) async {
     try {
@@ -91,15 +102,86 @@ class TokenService {
     }
   }
 
+  // ============================================
+  // LOGIN RESPONSE METHODS (NEW)
+  // ============================================
+
+  /// Save complete LoginResponseModel after successful login
+  Future<void> saveLoginResponse(LoginResponseModel loginResponse) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Convert the model to JSON string
+      final jsonString = json.encode(loginResponse.toJson());
+
+      // Store in SharedPreferences
+      await prefs.setString(_loginResponseKey, jsonString);
+      print('✅ Login response data saved successfully');
+    } catch (e) {
+      print('❌ Error saving login response: $e');
+    }
+  }
+
+  /// Retrieve stored LoginResponseModel
+  Future<LoginResponseModel?> getLoginResponse() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_loginResponseKey);
+
+      if (jsonString != null && jsonString.isNotEmpty) {
+        final Map<String, dynamic> jsonData = json.decode(jsonString);
+        print('✅ Login response data retrieved successfully');
+        return LoginResponseModel.fromJson(jsonData);
+      } else {
+        print('⚠️ No stored login response found');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error reading login response: $e');
+      return null;
+    }
+  }
+
+  /// Check if user is logged in (has both auth token and login data)
+  Future<bool> isUserLoggedIn() async {
+    try {
+      final authToken = await getAuthToken();
+      final loginResponse = await getLoginResponse();
+
+      final isLoggedIn = authToken != null &&
+          authToken.isNotEmpty &&
+          loginResponse != null;
+
+      print(isLoggedIn
+          ? '✅ User is logged in'
+          : '⚠️ User is not logged in');
+
+      return isLoggedIn;
+    } catch (e) {
+      print('❌ Error checking login status: $e');
+      return false;
+    }
+  }
+
+  // ============================================
+  // CLEAR/LOGOUT METHODS
+  // ============================================
+
   // Clear all tokens (for logout)
   Future<void> clearAllTokens() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_fcmTokenKey);
       await prefs.remove(_authTokenKey);
+      await prefs.remove(_loginResponseKey); // UPDATED - also clear login data
       print("✅ All tokens cleared");
     } catch (e) {
       print("❌ Error clearing tokens: $e");
     }
+  }
+
+  /// Alternative name for clearAllTokens (more descriptive)
+  Future<void> logout() async {
+    await clearAllTokens();
   }
 }

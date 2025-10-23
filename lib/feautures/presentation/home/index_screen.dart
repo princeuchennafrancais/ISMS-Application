@@ -128,7 +128,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
             Positioned(
               left: 20.w,
               right: 20.w,
-              bottom: 20.h,
+              bottom: 20.h + MediaQuery.viewPaddingOf(context).bottom,
               child: SlideTransition(
                 position: Tween<Offset>(
                   begin: const Offset(0, 1),

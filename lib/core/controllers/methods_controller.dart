@@ -133,10 +133,17 @@ class AuthController extends GetxController {
           // Get token from the payload
           final token = payload['token'];
 
-          // Store token in SharedPreferences
+          // ✅ STEP 1: Store auth token (you already have this)
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           print("🔐 Token saved locally: $token");
+
+          // ✅ STEP 2: Store auth token using TokenService (for consistency)
+          await TokenService().storeAuthToken(token);
+
+          // ✅ STEP 3: Save complete login response (NEW - ADD THIS!)
+          await TokenService().saveLoginResponse(loginResponseModel);
+          print("💾 Complete login response saved");
 
           if (context.mounted) {
             CustomSnackbar.success(payload['message'] ?? 'Login successful');

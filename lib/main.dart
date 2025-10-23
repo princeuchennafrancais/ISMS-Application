@@ -234,30 +234,40 @@ class AppInitializer {
           print('✓ School color: ${schoolData.colorHex}');
 
           // School data exists, check if user is logged in
-          final authToken = await TokenService().getAuthToken();
-          if (authToken != null && authToken.isNotEmpty) {
-            // User is logged in and has school data, go to launch screen
-            print('✓ User is logged in, going to launch screen');
-            return const Launch();  // ✅ FIXED - go to Launch
+          final bool isLoggedIn = await TokenService().isUserLoggedIn();
+          if (isLoggedIn) {
+            // User is logged in and has school data, get stored login data
+            print('✓ User is logged in, loading stored user data...');
+
+            final loginResponse = await TokenService().getLoginResponse();
+
+            if (loginResponse != null) {
+              print('✓ User data loaded, going to home screen');
+              return LoginScreen();
+            } else {
+              // Login data corrupted, go to login screen
+              print('⚠️ Login data not found, going to login screen');
+              return const LoginScreen();
+            }
           } else {
-            // User has school data but not logged in, go to login
-            print('✓ User not logged in, going to login screen');
-            return const LoginScreen();  // ✅ FIXED - go to LoginScreen
-          }
-        } else {
-          // School data exists but couldn't load it, go to school code screen
-          print('⚠️ School data exists but couldn\'t load, going to school code screen');
-          return const SchoolCodeScreen();
+          // User has school data but not logged in, go to login
+          print('✓ User not logged in, going to login screen');
+          return const LoginScreen();
         }
       } else {
-        // No school data, user needs to enter school code first
-        print('ℹ️ No school data found, going to school code screen');
+        // School data exists but couldn't load it, go to school code screen
+        print('⚠️ School data exists but couldn\'t load, going to school code screen');
         return const SchoolCodeScreen();
       }
+    } else {
+    // No school data, user needs to enter school code first
+    print('ℹ️ No school data found, going to school code screen');
+    return const SchoolCodeScreen();
+    }
     } catch (e) {
-      print('❌ Error during app initialization: $e');
-      // On error, default to school code screen
-      return const SchoolCodeScreen();
+    print('❌ Error during app initialization: $e');
+    // On error, default to school code screen
+    return const SchoolCodeScreen();
     }
   }
 }
