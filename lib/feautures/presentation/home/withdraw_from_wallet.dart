@@ -1974,7 +1974,7 @@ class _WithdrawFromWalletState extends State<WithdrawFromWallet> with TickerProv
 
               _buildContinueButton(),
 
-              SizedBox(height: 70.h),
+              SizedBox(height: 120.h),
             ],
           ),
         ),

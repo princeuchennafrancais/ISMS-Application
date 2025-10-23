@@ -704,7 +704,7 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
             ),
             SizedBox(height: 50.h),
             _buildFetchButton(),
-            SizedBox(height: 90.h),
+            SizedBox(height: 120.h),
           ],
         ),
       ),

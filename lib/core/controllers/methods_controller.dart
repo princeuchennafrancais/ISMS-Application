@@ -533,7 +533,6 @@ class AuthController extends GetxController {
         throw Exception("No token found. Please login again.");
       }
 
-      // Format phone number to international format if it's not already
       String formattedPhone = formatPhoneNumber(phone);
 
       print("🔄 Attempting createWallet at: ${APIEndpoints.createWalletEndpoint}");
@@ -543,25 +542,26 @@ class AuthController extends GetxController {
       print("📝 Phone (formatted): $formattedPhone");
       print("🔐 Token: $token");
 
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(APIEndpoints.createWalletEndpoint),
-      );
-
-      request.fields['bvn'] = bvn;
-      request.fields['email'] = email;
-      request.fields['phone'] = formattedPhone;
-      request.fields['phone'] = formattedPhone;
-
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-        'scode': schoolCode,
+      // Prepare JSON body
+      final body = jsonEncode({
+        'bvn': bvn,
+        'email': email,
+        'phone': formattedPhone,
       });
 
-      print("📤 Sending create wallet request...");
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      print("📤 Sending create wallet request with body: $body");
+
+      // Use regular http.post with JSON body
+      var response = await http.post(
+        Uri.parse(APIEndpoints.createWalletEndpoint),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json', // Important for JSON body
+          'scode': schoolCode,
+        },
+        body: body,
+      );
 
       print("📥 Response Status: ${response.statusCode}");
       print("📥 Response Body: ${response.body}");
@@ -577,14 +577,20 @@ class AuthController extends GetxController {
       }
 
       if (response.statusCode == 200) {
-        if (responseData != null && responseData['status'] == 1) {
+        if (responseData != null &&
+            responseData['state']?['status'] == 1 &&
+            responseData['payload']?['status'] == 1) {
           if (context.mounted) {
-            CustomSnackbar.success(responseData['message'] ?? 'Wallet created successfully');
+            CustomSnackbar.success(
+                responseData['payload']['message'] ?? 'Wallet created successfully'
+            );
           }
 
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => CreatePin(loginResponse: loginResponse)),
+            MaterialPageRoute(
+                builder: (context) => CreatePin(loginResponse: loginResponse)
+            ),
           );
         } else {
           handleWalletError(responseData ?? {}, context);

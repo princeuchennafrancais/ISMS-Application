@@ -507,7 +507,37 @@ class _ViewAnnualResultScreenState extends State<ViewAnnualResultScreen>
                   ],
                 ),
               ),
-
+              SizedBox(height: 8.h,),
+              Padding(
+                padding: EdgeInsets.only(left: 15.w, right: 15.w),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50.h,
+                  child: ElevatedButton.icon(
+                    onPressed: isDownloading ? null : _downloadResult,
+                    icon: Icon(
+                      isDownloading ? Icons.downloading : Icons.download,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      isDownloading ? 'Downloading...' : 'Download Annual Result',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      disabledBackgroundColor: Colors.grey[400],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+              ),
               // TabBar
               Container(
                 color: Colors.white,
@@ -554,85 +584,11 @@ class _ViewAnnualResultScreenState extends State<ViewAnnualResultScreen>
                   ],
                 ),
               ),
+              SizedBox(height: 20.h,)
             ],
           ),
 
           // Download Button at Bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 1,
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Download Progress Bar
-                  if (isDownloading)
-                    Column(
-                      children: [
-                        LinearProgressIndicator(
-                          value: downloadProgress,
-                          backgroundColor: Colors.grey[200],
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primaryBlue,
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        Text(
-                          'Downloading... ${(downloadProgress * 100).toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                      ],
-                    ),
-
-                  // Main Download Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50.h,
-                    child: ElevatedButton.icon(
-                      onPressed: isDownloading ? null : _downloadResult,
-                      icon: Icon(
-                        isDownloading ? Icons.downloading : Icons.download,
-                        color: Colors.white,
-                      ),
-                      label: Text(
-                        isDownloading ? 'Downloading...' : 'Download Annual Result',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        disabledBackgroundColor: Colors.grey[400],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

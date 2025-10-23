@@ -682,6 +682,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
                 // Filter Chips
                 buildFilterChips(),
+
               ],
             ),
           ),
@@ -838,6 +839,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
               ),
             ),
           ),
+          SizedBox(height: 120.h,)
         ],
       ),
     );

@@ -235,6 +235,7 @@ class _ChangePinState extends State<ChangePin> with TickerProviderStateMixin {
                 children: [
                   _buildHeaderSection(),
                   _buildFormSection(),
+                  SizedBox(height: 120.h,)
                 ],
               ),
             ),

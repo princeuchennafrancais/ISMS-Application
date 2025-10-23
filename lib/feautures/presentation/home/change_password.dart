@@ -448,6 +448,7 @@ class _ChangePasswordState extends State<ChangePassword>
                       child: _buildHeaderSection(),
                     ),
                     _buildFormSection(),
+                    SizedBox(height: 120.h,)
                   ],
                 ),
               ),
@@ -651,7 +652,7 @@ class _ChangePasswordState extends State<ChangePassword>
 
               _buildChangePasswordButton(),
 
-              SizedBox(height: 80.h),
+
             ],
           ),
         ),

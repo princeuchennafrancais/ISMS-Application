@@ -244,7 +244,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
                       children: [
                         SizedBox(height: 20.h),
                         _buildMenuItems(userData),
-                        SizedBox(height: 110.h),
+                        SizedBox(height: 60.h),
                         _buildFooter(userData),
                         SizedBox(height: 20.h),
                       ],

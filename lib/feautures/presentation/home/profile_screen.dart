@@ -343,6 +343,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               children: [
                 _buildHeaderSection(),
                 _buildProfileDetailsSection(),
+                SizedBox(height: 120.h,)
               ],
             ),
           ),
