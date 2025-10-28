@@ -107,12 +107,24 @@ class TokenService {
   // ============================================
 
   /// Save complete LoginResponseModel after successful login
+// In TokenService class, update saveLoginResponse method
   Future<void> saveLoginResponse(LoginResponseModel loginResponse) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      // DEBUG: Check the role before saving
+      print('💾 BEFORE SAVING LOGIN RESPONSE:');
+      print('   - Role: ${loginResponse.role}');
+      print('   - Data role: ${loginResponse.data?.role}');
+
       // Convert the model to JSON string
       final jsonString = json.encode(loginResponse.toJson());
+
+      // DEBUG: Check what was actually saved
+      final savedData = json.decode(jsonString);
+      print('💾 ACTUALLY SAVED TO STORAGE:');
+      print('   - Saved role: ${savedData['role']}');
+      print('   - Saved data role: ${savedData['data']?['role']}');
 
       // Store in SharedPreferences
       await prefs.setString(_loginResponseKey, jsonString);

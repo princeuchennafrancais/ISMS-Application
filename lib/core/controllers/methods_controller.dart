@@ -130,6 +130,8 @@ class AuthController extends GetxController {
           // Create login response model from the payload data
           loginResponseModel = LoginResponseModel.fromJson(payload);
 
+
+
           // Get token from the payload
           final token = payload['token'];
 

@@ -4,10 +4,18 @@ class LoginResponseModel {
   String? token;
   String? username;
   LoginData? data;
-  bool? hasWallet; // ✅ Added here (NOT in LoginData)
+  bool? hasWallet;
   String? role;
 
-  LoginResponseModel({this.status, this.message, this.token, this.data, this.hasWallet,  this.username, this.role,});
+  LoginResponseModel({
+    this.status,
+    this.message,
+    this.token,
+    this.data,
+    this.hasWallet,
+    this.username,
+    this.role,
+  });
 
   LoginResponseModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
@@ -16,7 +24,12 @@ class LoginResponseModel {
     token = json['token'];
     data = json['data'] != null ? LoginData.fromJson(json['data']) : null;
     hasWallet = json['has_wallet'];
-    role = json['role'];
+    role = json['role']; // This is correctly reading from JSON
+
+    // Add debug logging
+    print('🔍 LOGIN MODEL - FROM JSON:');
+    print('   - Role from API: $role');
+    print('   - Data role: ${data?.role}');
   }
 
   Map<String, dynamic> toJson() {
@@ -29,10 +42,16 @@ class LoginResponseModel {
       map['data'] = data!.toJson();
     }
     map['has_wallet'] = hasWallet;
+    map['role'] = role; // ✅ FIXED: Now including role!
+
+    // Add debug logging
+    print('🔍 LOGIN MODEL - TO JSON:');
+    print('   - Role being saved: $role');
+    print('   - Full JSON being saved: $map');
+
     return map;
   }
 }
-
 class LoginData {
   String? id;
   String? classarmId;
