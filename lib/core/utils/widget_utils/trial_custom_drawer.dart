@@ -9,6 +9,8 @@ import 'package:wallet/feautures/presentation/home/change_pin.dart';
 import 'package:wallet/feautures/presentation/home/notification_screen.dart';
 import 'package:wallet/feautures/presentation/home/profile_screen.dart';
 
+import '../../../feautures/presentation/home/school_fee.dart';
+
 class TrialCustomDrawer extends StatefulWidget {
   final String userName;
   final String profPic;
@@ -413,6 +415,18 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => ChangePassword(loginResponse: widget.loginResponseModel)),
+            );
+          },
+        },
+      if (userData.role == "student")
+        {
+          'icon': Icons.payments_rounded,
+          'title': 'Pay School Fee',
+          'onTap': () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SchoolFeesScreen(
+              )),
             );
           },
         },
