@@ -246,8 +246,6 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
                       children: [
                         SizedBox(height: 20.h),
                         _buildMenuItems(userData),
-                        SizedBox(height: 0.h),
-                        _buildFooter(userData),
                         SizedBox(height: 20.h),
                       ],
                     ),
@@ -511,62 +509,4 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
     );
   }
 
-  Widget _buildFooter(LoginResponseModel userData) {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: Colors.transparent,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: SchoolLogoWidget(
-                  width: 39.w,
-                  height: 39.w,
-                  borderRadius: BorderRadius.circular(60.r), // makes it circular
-                  fallbackAsset: "assets/icons/Untitled-3.png", // optional
-                  fit: BoxFit.cover,
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rosary College Nise',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryBlue,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                    Text(
-                      userData.role == "student" ? 'Student Portal' : 'Sales Portal',
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        color: Colors.grey[600],
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }}
+}

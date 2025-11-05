@@ -19,7 +19,7 @@ class ActionsButton extends StatelessWidget {
         // Enhanced Container with header-style glassmorphism - BIGGER WHITE BACKGROUND
         Container(
           width: 160.w, // Made much bigger
-          height: 160.h, // Made much bigger
+          height: 120.h, // Made much bigger
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -29,7 +29,7 @@ class ActionsButton extends StatelessWidget {
                 Colors.white.withOpacity(0.8),
               ],
             ),
-            borderRadius: BorderRadius.circular(18.r),
+            borderRadius: BorderRadius.circular(12.r),
             boxShadow: [
               BoxShadow(
                 color: AppColors.primaryBlue.withOpacity(0.3),
@@ -42,8 +42,8 @@ class ActionsButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 60.w,
-                height: 60.h,
+                width: 50.w,
+                height: 50.h,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -54,7 +54,7 @@ class ActionsButton extends StatelessWidget {
                       AppColors.primaryBlue.withOpacity(0.8),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(13.r),
+                  borderRadius: BorderRadius.circular(10.r),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.primaryBlue.withOpacity(0.3),
@@ -65,6 +65,7 @@ class ActionsButton extends StatelessWidget {
                 ),
                 child: Center(
                   child: Image.asset(
+                    color: Colors.white,
                     image,
                     height: 28.h,
                     width: 28.w,

@@ -32,63 +32,86 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GestureDetector(
-          //   child: ActionsButton(
-          //     image: "assets/icons/Group 4.png",
-          //     label: "Deposit",
-          //   ),
-          //   onTap: () {
-          //     Navigator.pushNamed(context, AppRoutes.creditWallet);
-          //   },
-          // ),
+          // First Button - Conditional based on role
           lrgm.role != "student"
-              ? GestureDetector(
-            child: ActionsButton(
-              image: "assets/icons/Vector_something.png",
-              label: "QR payment",
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PaymentScreen(
-                    loginResponseModel: lrgm,
-                    navigationSource: NavigationSource.button,
+              ? Expanded(
+            child: GestureDetector(
+              child: ActionsButton(
+                image: "assets/icons/Vector_something.png",
+                label: "QR payment",
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PaymentScreen(
+                      loginResponseModel: lrgm,
+                      navigationSource: NavigationSource.button,
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           )
-              : GestureDetector(
-            child: ActionsButton(
-              image: "assets/icons/check result.png",
-              label: "Check Result",
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StudentResultScreen(
-                    loginResponseModel: lrgm,
-                    navigationSource: NavigationSource.button,
+              : Expanded(
+            child: GestureDetector(
+              child: ActionsButton(
+                image: "assets/icons/check result.png",
+                label: "Check Result",
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StudentResultScreen(
+                      loginResponseModel: lrgm,
+                      navigationSource: NavigationSource.button,
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          GestureDetector(
-            child: ActionsButton(
-              image: "assets/icons/images-removebg-preview.png",
-              label: "News Letter",
+                );
+              },
             ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(),
-                )
-              );
-            },
+          ),
+
+          SizedBox(width: 10.w), // Spacing between buttons
+
+          // Second Button - News Letter
+          Expanded(
+            child: GestureDetector(
+              child: ActionsButton(
+                image: "assets/icons/images-removebg-preview.png",
+                label: "News Letter",
+              ),
+              onTap: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NotificationScreen(),
+                    )
+                );
+              },
+            ),
+          ),
+
+          SizedBox(width: 10.w), // Spacing between buttons
+
+          // Third Button - Pay Fees
+          Expanded(
+            child: GestureDetector(
+              child: ActionsButton(
+                image: "assets/icons/fees_icon.png", // You'll need to add this icon
+                label: "Pay Fees",
+              ),
+              onTap: () {
+                // Add navigation for Pay Fees screen here
+                // Navigator.push(
+                //   context,
+                //   MaterialPageRoute(
+                //     builder: (context) => PayFeesScreen(),
+                //   ),
+                // );
+              },
+            ),
           ),
         ],
       ),
