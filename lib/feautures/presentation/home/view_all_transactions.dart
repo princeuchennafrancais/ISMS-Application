@@ -9,8 +9,8 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wallet/core/utils/color_utils/color_util.dart';
 import '../../../core/models/transactionHist_model.dart';
-import '../../../core/controllers/school_service.dart'; // Add this import
-
+import '../../../core/controllers/school_service.dart';
+import '../../../core/models/login_model.dart'; // Add this import
 
 class AllTransactionsScreen extends StatefulWidget {
   const AllTransactionsScreen({super.key});
@@ -25,6 +25,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
   bool isLoadingTransactions = true;
   String? transactionError;
   String? schoolCode;
+  bool? paymentSettingExists; // Add this to track payment settings
 
   String selectedFilter = 'All';
   String searchQuery = '';
@@ -51,9 +52,29 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
       final schoolData = await SchoolDataService.getSchoolData();
       schoolCode = schoolData?.schoolCode ?? "";
 
+      // Get payment settings from saved login response
+      final prefs = await SharedPreferences.getInstance();
+      final loginResponseJson = prefs.getString('login_response');
+
+      if (loginResponseJson != null) {
+        final loginData = jsonDecode(loginResponseJson);
+        paymentSettingExists = loginData['payment_setting_exists'] == true;
+        print("🎯 AllTransactionsScreen - Payment Setting Exists: $paymentSettingExists");
+      } else {
+        paymentSettingExists = true; // Default to true if not found
+        print("⚠️ AllTransactionsScreen - No login response found, defaulting payment settings to true");
+      }
+
       print("🏫 School code initialized: '$schoolCode'");
 
-      await fetchAllTransactions();
+      // Only fetch transactions if payment settings are enabled
+      if (paymentSettingExists == true) {
+        await fetchAllTransactions();
+      } else {
+        setState(() {
+          isLoadingTransactions = false;
+        });
+      }
     } catch (e) {
       print("❌ Error initializing data: $e");
       setState(() {
@@ -345,6 +366,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
       });
     }
   }
+
   void applyFilters() {
     List<TransactionModel> filtered = List.from(allTransactions);
 
@@ -378,6 +400,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
       filteredTransactions = filtered;
     });
   }
+
   /// Handle search
   void onSearchChanged(String value) {
     setState(() {
@@ -586,7 +609,6 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
   }
 
   /// Build filter chips
-  /// Build filter chips
   Widget buildFilterChips() {
     final filters = ['All', 'Debit', 'Credit'];
 
@@ -644,13 +666,92 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
       ),
     );
   }
+
+  /// Build payment disabled state
+  Widget _buildPaymentDisabledState() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120.w,
+              height: 120.h,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.payment_outlined,
+                size: 50.sp,
+                color: Colors.orange,
+              ),
+            ),
+            SizedBox(height: 24.h),
+            Text(
+              "Transaction History Unavailable",
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              "Wallet services are currently disabled.\nTransaction history cannot be accessed.",
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14.sp,
+                fontFamily: 'Poppins',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 24.h),
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16.sp,
+                    color: Colors.orange[700],
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    "Payment Settings: OFF",
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange[700],
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-
         foregroundColor: Colors.white,
         leading: GestureDetector(
           child: Icon(Icons.arrow_back, color: AppColors.primaryBlue,),
@@ -671,41 +772,43 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
       ),
       body: Column(
         children: [
-          // Search and Filter Section
-          Container(
-            color: Colors.transparent,
-            padding: EdgeInsets.all(16.w),
-            child: Column(
-              children: [
-
-                SizedBox(height: 6.h),
-
-                // Filter Chips
-                buildFilterChips(),
-
-              ],
-            ),
-          ),
-
-          // Transaction Count
-          if (!isLoadingTransactions && transactionError == null)
+          // Only show search and filter section if payment settings are enabled
+          if (paymentSettingExists == true) ...[
+            // Search and Filter Section
             Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              child: Text(
-                '${filteredTransactions.length} transaction${filteredTransactions.length != 1 ? 's' : ''} found',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12.sp,
-                ),
+              color: Colors.transparent,
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                children: [
+                  SizedBox(height: 6.h),
+                  // Filter Chips
+                  buildFilterChips(),
+                ],
               ),
             ),
 
-          // Transactions List
+            // Transaction Count
+            if (!isLoadingTransactions && transactionError == null)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                child: Text(
+                  '${filteredTransactions.length} transaction${filteredTransactions.length != 1 ? 's' : ''} found',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12.sp,
+                  ),
+                ),
+              ),
+          ],
+
+          // Transactions List or Payment Disabled State
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => fetchAllTransactions(),
-              child: isLoadingTransactions
+              onRefresh: paymentSettingExists == true ? () => fetchAllTransactions() : () async {},
+              child: paymentSettingExists == false
+                  ? _buildPaymentDisabledState()
+                  : isLoadingTransactions
                   ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

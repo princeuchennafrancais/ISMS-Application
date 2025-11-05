@@ -484,17 +484,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         SizedBox(height: 70.h),
                         _buildWelcomeText(),
                         SizedBox(height: 40.h),
-
-                        // Fingerprint option (shown only when available and user has logged in before)
-
-
                         _buildLoginForm(context),
                         SizedBox(height: 20.h),
                         _buildForgotPassword(),
+                        SizedBox(height: 20.h,),
                         if (_showFingerprintOption) ...[
-                          _buildFingerprintOption(),
-                          SizedBox(height: 30.h),
                           _buildDivider(),
+                          SizedBox(height: 30.h),
+                          _buildFingerprintOption(),
                         ],
                         SizedBox(height: 40.h),
                         _buildFooter(),

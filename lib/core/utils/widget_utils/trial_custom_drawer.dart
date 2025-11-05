@@ -225,7 +225,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
   Widget build(BuildContext context) {
     String baseUrl = "https://rosarycollegenise.com/";
     final userData = widget.loginResponseModel;
-
+    print(" this is the mother sucking shit ${userData.paymentSettingExists}");
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -288,7 +288,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () => Navigator.pop(context),
                 child: Container(
                   padding: EdgeInsets.all(8.w),
                   decoration: BoxDecoration(
@@ -396,7 +396,8 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
           );
         },
       },
-      {
+      if (userData.paymentSettingExists == false)
+        {
         'icon': Icons.lock_outline_rounded,
         'title': 'Change Pin',
         'onTap': () {
@@ -416,7 +417,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
             );
           },
         },
-      if (userData.role == "student")
+      if (userData.paymentSettingExists == false)
         {
           'icon': Icons.payments_rounded,
           'title': 'Pay School Fee',
@@ -428,6 +429,9 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
             );
           },
         },
+
+      // if(userData.paymentSettingExists == true)
+
 
       {
         'icon': Icons.logout_rounded,

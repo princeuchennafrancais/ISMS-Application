@@ -127,10 +127,11 @@ class AuthController extends GetxController {
         // Access the payload first, then check status
         final payload = responseData['payload'];
         if (payload != null && payload['status'] == 1) {
-          // Create login response model from the payload data
-          loginResponseModel = LoginResponseModel.fromJson(payload);
+          // ❌ WRONG: Only passing payload, missing payment_setting_exists
+          // loginResponseModel = LoginResponseModel.fromJson(payload);
 
-
+          // ✅ CORRECT: Pass the ENTIRE responseData to include payment_setting_exists
+          loginResponseModel = LoginResponseModel.fromJson(responseData);
 
           // Get token from the payload
           final token = payload['token'];

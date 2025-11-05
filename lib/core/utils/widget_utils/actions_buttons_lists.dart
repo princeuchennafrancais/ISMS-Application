@@ -27,55 +27,60 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
     final userData = widget.loginResponseModel.data;
     final lrgm = widget.loginResponseModel;
 
+    // Check if payment settings are disabled
+    final isPaymentDisabled = lrgm.paymentSettingExists == true;
+
     return Padding(
       padding: EdgeInsets.only(top: 60.h, left: 15.w, right: 15.w),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // First Button - Conditional based on role
-          lrgm.role != "student"
-              ? Expanded(
-            child: GestureDetector(
-              child: ActionsButton(
-                image: "assets/icons/Vector_something.png",
-                label: "QR payment",
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PaymentScreen(
-                      loginResponseModel: lrgm,
-                      navigationSource: NavigationSource.button,
+          if (!isPaymentDisabled) ...[
+            // First Button - Conditional based on role (only show if payments enabled)
+            lrgm.role != "student"
+                ? Expanded(
+              child: GestureDetector(
+                child: ActionsButton(
+                  image: "assets/icons/Vector_something.png",
+                  label: "QR payment",
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PaymentScreen(
+                        loginResponseModel: lrgm,
+                        navigationSource: NavigationSource.button,
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          )
-              : Expanded(
-            child: GestureDetector(
-              child: ActionsButton(
-                image: "assets/icons/check result.png",
-                label: "Check Result",
+                  );
+                },
               ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => StudentResultScreen(
-                      loginResponseModel: lrgm,
-                      navigationSource: NavigationSource.button,
+            )
+                : Expanded(
+              child: GestureDetector(
+                child: ActionsButton(
+                  image: "assets/icons/check result.png",
+                  label: "Check Result",
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentResultScreen(
+                        loginResponseModel: lrgm,
+                        navigationSource: NavigationSource.button,
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
 
-          SizedBox(width: 10.w), // Spacing between buttons
+            SizedBox(width: 10.w), // Spacing between buttons
+          ],
 
-          // Second Button - News Letter
+          // Second Button - News Letter (Always show)
           Expanded(
             child: GestureDetector(
               child: ActionsButton(
@@ -93,26 +98,54 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
             ),
           ),
 
-          SizedBox(width: 10.w), // Spacing between buttons
+          if (!isPaymentDisabled) ...[
+            SizedBox(width: 10.w), // Spacing between buttons
 
-          // Third Button - Pay Fees
-          Expanded(
-            child: GestureDetector(
-              child: ActionsButton(
-                image: "assets/icons/fees_icon.png", // You'll need to add this icon
-                label: "Pay Fees",
+            // Third Button - Pay Fees (only show if payments enabled)
+            Expanded(
+              child: GestureDetector(
+                child: ActionsButton(
+                  image: "assets/icons/fees_icon.png",
+                  label: "Pay Fees",
+                ),
+                onTap: () {
+                  // Add navigation for Pay Fees screen here
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(
+                  //     builder: (context) => PayFeesScreen(),
+                  //   ),
+                  // );
+                },
               ),
-              onTap: () {
-                // Add navigation for Pay Fees screen here
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(
-                //     builder: (context) => PayFeesScreen(),
-                //   ),
-                // );
-              },
             ),
-          ),
+          ],
+
+          // If payments are disabled, we need to adjust spacing to center the two buttons
+          if (isPaymentDisabled) ...[
+            SizedBox(width: 10.w), // Add spacing for centering
+
+            // Add Check Result button when payments are disabled
+            Expanded(
+              child: GestureDetector(
+                child: ActionsButton(
+                  image: "assets/icons/check result.png",
+                  label: "Check Result",
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentResultScreen(
+                        loginResponseModel: lrgm,
+                        navigationSource: NavigationSource.button,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );

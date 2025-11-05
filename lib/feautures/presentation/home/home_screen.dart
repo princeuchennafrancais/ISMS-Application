@@ -755,6 +755,82 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+  // Add this method to your HomeScreen class
+  Widget _buildPaymentDisabledTransactionState() {
+    return Container(
+      alignment: Alignment.center,
+      padding: EdgeInsets.symmetric(vertical: 60.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 80.w,
+            height: 80.h,
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.payment_outlined,
+              size: 40.sp,
+              color: Colors.orange[600],
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Text(
+            "Transaction History Unavailable",
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            "Wallet services are currently Unavailable.\nTransaction history cannot be accessed.",
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14.sp,
+              fontFamily: 'Poppins',
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 24.h),
+          Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 16.sp,
+                  color: Colors.orange[700],
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  "Payment Service: Unavailable",
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange[700],
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Build modern empty state
   Widget buildEmptyState() {
@@ -815,6 +891,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    print("🎯 HOME SCREEN DEBUG:");
+    print("   - Payment Setting Exists: ${widget.loginResponse.paymentSettingExists}");
+    print("   - Has Wallet: ${widget.loginResponse.hasWallet}");
+    print("   - Role: ${widget.loginResponse.role}");
+    print("   - Username: ${widget.loginResponse.username}");
+
     final userData = widget.loginResponse.data;
     return Scaffold(
       key: _scaffoldKey,
@@ -875,8 +957,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                               SizedBox(height: 24.h),
 
-                              // Transaction List or States
-                              if (isLoadingTransactions)
+                              if (widget.loginResponse.paymentSettingExists == true)
+                                _buildPaymentDisabledTransactionState()
+                              else if (isLoadingTransactions)
                                 Container(
                                   alignment: Alignment.center,
                                   padding: EdgeInsets.symmetric(vertical: 60.h),
@@ -910,101 +993,100 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                 )
                               else if (transactionError != null)
-                                Container(
-                                  alignment: Alignment.center,
-                                  padding: EdgeInsets.symmetric(vertical: 60.h),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 80.w,
-                                        height: 80.h,
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.1),
-                                          shape: BoxShape.circle,
+                                  Container(
+                                    alignment: Alignment.center,
+                                    padding: EdgeInsets.symmetric(vertical: 60.h),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 80.w,
+                                          height: 80.h,
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withOpacity(0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.error_outline_rounded,
+                                            size: 40.sp,
+                                            color: Colors.red[600],
+                                          ),
                                         ),
-                                        child: Icon(
-                                          Icons.error_outline_rounded,
-                                          size: 40.sp,
-                                          color: Colors.red[600],
+                                        SizedBox(height: 20.h),
+                                        Text(
+                                          "Something went wrong",
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 18.sp,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Poppins',
+                                          ),
                                         ),
-                                      ),
-                                      SizedBox(height: 20.h),
-                                      Text(
-                                        "Something went wrong",
-                                        style: TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 18.sp,
-                                          fontWeight: FontWeight.w600,
-                                          fontFamily: 'Poppins',
+                                        SizedBox(height: 8.h),
+                                        Text(
+                                          transactionError!,
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14.sp,
+                                            fontFamily: 'Poppins',
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                      ),
-                                      SizedBox(height: 8.h),
-                                      Text(
-                                        transactionError!,
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 14.sp,
-                                          fontFamily: 'Poppins',
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      SizedBox(height: 24.h),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              AppColors.primaryBlue,
-                                              AppColors.primaryBlue.withOpacity(0.8),
+                                        SizedBox(height: 24.h),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                AppColors.primaryBlue,
+                                                AppColors.primaryBlue.withOpacity(0.8),
+                                              ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(12.r),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppColors.primaryBlue.withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
                                             ],
                                           ),
-                                          borderRadius: BorderRadius.circular(12.r),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: AppColors.primaryBlue.withOpacity(0.3),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
+                                          child: ElevatedButton(
+                                            onPressed: refreshTransactions,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.transparent,
+                                              foregroundColor: Colors.white,
+                                              shadowColor: Colors.transparent,
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 32.w,
+                                                vertical: 12.h,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12.r),
+                                              ),
                                             ),
-                                          ],
-                                        ),
-                                        child: ElevatedButton(
-                                          onPressed: refreshTransactions,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.transparent,
-                                            foregroundColor: Colors.white,
-                                            shadowColor: Colors.transparent,
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 32.w,
-                                              vertical: 12.h,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12.r),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            "Try Again",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 16.sp,
-                                              fontFamily: 'Poppins',
+                                            child: Text(
+                                              "Try Again",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 16.sp,
+                                                fontFamily: 'Poppins',
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else if (recentTransactions.isEmpty)
-                                  buildEmptyState()
-                                else
-                                  Column(
-                                    children: [
-                                      ...recentTransactions.asMap().entries.map((entry) =>
-                                          buildTransactionItem(entry.value, entry.key)
-                                      ),
-                                    ],
-                                  ),
-
+                                      ],
+                                    ),
+                                  )
+                                else if (recentTransactions.isEmpty)
+                                    buildEmptyState()
+                                  else
+                                    Column(
+                                      children: [
+                                        ...recentTransactions.asMap().entries.map((entry) =>
+                                            buildTransactionItem(entry.value, entry.key)
+                                        ),
+                                      ],
+                                    ),
                               SizedBox(height: 100.h),
                             ],
                           ),

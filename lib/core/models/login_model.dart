@@ -6,6 +6,7 @@ class LoginResponseModel {
   LoginData? data;
   bool? hasWallet;
   String? role;
+  bool? paymentSettingExists;
 
   LoginResponseModel({
     this.status,
@@ -15,21 +16,100 @@ class LoginResponseModel {
     this.hasWallet,
     this.username,
     this.role,
+    this.paymentSettingExists,
   });
 
-  LoginResponseModel.fromJson(Map<String, dynamic> json) {
-    status = json['status'];
-    message = json['message'];
-    username = json['username'];
-    token = json['token'];
-    data = json['data'] != null ? LoginData.fromJson(json['data']) : null;
-    hasWallet = json['has_wallet'];
-    role = json['role']; // This is correctly reading from JSON
+  factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
+    print('🎯 ========== DEBUGGING LOGIN RESPONSE ==========');
+    print('🔑 ROOT JSON KEYS: ${json.keys.toList()}');
 
-    // Add debug logging
-    print('🔍 LOGIN MODEL - FROM JSON:');
-    print('   - Role from API: $role');
-    print('   - Data role: ${data?.role}');
+    // Check for the nested structure
+    bool hasState = json.containsKey('state');
+    bool hasPayload = json.containsKey('payload');
+    bool hasPaymentSetting = json.containsKey('payment_setting_exists');
+
+    print('🏛️ state exists: $hasState');
+    print('📦 payload exists: $hasPayload');
+    print('💰 payment_setting_exists exists: $hasPaymentSetting');
+    print('💰 payment_setting_exists value: ${json['payment_setting_exists']}');
+    print('💰 payment_setting_exists type: ${json['payment_setting_exists']?.runtimeType}');
+
+    // Handle the nested structure
+    Map<String, dynamic> payloadData = {};
+    bool finalPaymentSetting = true;
+
+    if (hasState && hasPayload) {
+      print('✅ Detected nested structure with state + payload');
+
+      // Get payment_setting_exists from ROOT level - FIXED LOGIC
+      finalPaymentSetting = json['payment_setting_exists'] == true;
+      print('✅ payment_setting_exists from root: $finalPaymentSetting');
+
+      // Get user data from payload
+      if (json['payload'] is Map<String, dynamic>) {
+        payloadData = json['payload'] as Map<String, dynamic>;
+        print('🔑 PAYLOAD KEYS: ${payloadData.keys.toList()}');
+
+        // Debug payload content
+        print('📋 Payload content:');
+        payloadData.forEach((key, value) {
+          print('   - $key: $value (${value.runtimeType})');
+        });
+      }
+    } else {
+      print('ℹ️ Using direct structure');
+      payloadData = json;
+      finalPaymentSetting = json['payment_setting_exists'] == true;
+    }
+
+    // Extract user data from payload
+    final data = payloadData['data'] != null && payloadData['data'] is Map<String, dynamic>
+        ? LoginData.fromJson(payloadData['data'])
+        : null;
+
+    // Debug username extraction
+    print('👤 Username extraction debug:');
+    print('   - payloadData contains username: ${payloadData.containsKey('username')}');
+    print('   - payloadData username value: ${payloadData['username']}');
+    print('   - data?.username: ${data?.username}');
+
+    final model = LoginResponseModel(
+      status: _parseInt(payloadData['status']),
+      message: payloadData['message']?.toString(),
+      token: payloadData['token']?.toString(),
+      // ✅ FIXED: Get username from payload, not from data
+      username: payloadData['username']?.toString() ?? data?.username,
+      data: data,
+      hasWallet: payloadData['has_wallet'] == true,
+      role: payloadData['role']?.toString(),
+      // ✅ FIXED: Use the correctly extracted payment setting
+      paymentSettingExists: finalPaymentSetting,
+    );
+
+    print('🎯 ========== PARSED MODEL ==========');
+    print('✅ Status: ${model.status}');
+    print('✅ Message: ${model.message}');
+    print('✅ Token: ${model.token != null ? "Present" : "Null"}');
+    print('✅ Role: ${model.role}');
+    print('✅ Has Wallet: ${model.hasWallet}');
+    print('✅ Payment Setting Exists: ${model.paymentSettingExists}');
+    print('✅ Username: ${model.username}');
+    print('✅ Data: ${model.data != null ? "Present" : "Null"}');
+    if (model.data != null) {
+      print('✅ Data username: ${model.data!.username}');
+      print('✅ Data firstname: ${model.data!.firstname}');
+      print('✅ Data lastname: ${model.data!.lastname}');
+    }
+    print('🎯 ========== END DEBUG ==========');
+
+    return model;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -42,16 +122,12 @@ class LoginResponseModel {
       map['data'] = data!.toJson();
     }
     map['has_wallet'] = hasWallet;
-    map['role'] = role; // ✅ FIXED: Now including role!
-
-    // Add debug logging
-    print('🔍 LOGIN MODEL - TO JSON:');
-    print('   - Role being saved: $role');
-    print('   - Full JSON being saved: $map');
-
+    map['role'] = role;
+    map['payment_setting_exists'] = paymentSettingExists;
     return map;
   }
 }
+
 class LoginData {
   String? id;
   String? classarmId;

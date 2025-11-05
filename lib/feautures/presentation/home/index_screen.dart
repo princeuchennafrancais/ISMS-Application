@@ -6,6 +6,7 @@ import 'package:wallet/feautures/presentation/home/home_screen.dart';
 import 'package:wallet/feautures/presentation/home/payment_screen.dart';
 import 'package:wallet/feautures/presentation/home/student_result_screen.dart';
 import 'package:wallet/feautures/presentation/home/withdraw_from_wallet.dart';
+import 'package:wallet/feautures/presentation/home/notification_screen.dart'; // Add this import
 
 import '../../../core/models/login_model.dart';
 
@@ -48,12 +49,43 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
       vsync: this,
     );
 
+    // Debug the login response
+    _debugLoginResponse();
+
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) {
         _fabAnimController.forward();
       }
     });
   }
+
+  // Add this debug method
+  void _debugLoginResponse() {
+    print("🎯 ========== INDEX SCREEN DEBUG ==========");
+    print("🔑 Login Response Details:");
+    print("   - Role: ${widget.loginResponse.role}");
+    print("   - Has Wallet: ${widget.loginResponse.hasWallet}");
+    print("   - Payment Setting Exists: ${widget.loginResponse.paymentSettingExists}");
+    print("   - Status: ${widget.loginResponse.status}");
+    print("   - Message: ${widget.loginResponse.message}");
+    print("   - Username: ${widget.loginResponse.username}");
+
+    if (widget.loginResponse.data != null) {
+      print("   - Data: Present");
+      print("   - Firstname: ${widget.loginResponse.data!.firstname}");
+      print("   - Lastname: ${widget.loginResponse.data!.lastname}");
+    } else {
+      print("   - Data: Null");
+    }
+
+    // Debug third screen decision
+    print("🎯 Third Screen Configuration:");
+    print("   - Payment Setting Exists: ${widget.loginResponse.paymentSettingExists}");
+    print("   - Third Screen: ${widget.loginResponse.paymentSettingExists == true ? 'Withdraw' : 'News Letter'}");
+    print("   - Third Icon: ${widget.loginResponse.paymentSettingExists == true ? 'Icons.send_rounded' : 'Icons.newspaper_rounded'}");
+    print("🎯 ========== END DEBUG ==========");
+  }
+
 
   @override
   void dispose() {
@@ -88,9 +120,52 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
     }
   }
 
+  // New method to get the third screen based on payment settings
+  Widget _getThirdScreen() {
+    // If payment settings are enabled, show Withdraw screen
+    if (widget.loginResponse.paymentSettingExists == true) {
+      return WithdrawFromWallet(
+        loginResponse: widget.loginResponse,
+        scaffoldKey: GlobalKey<ScaffoldState>(),
+        navigationSource: NavigationSource.bottomBar,
+      );
+    } else {
+      // If payment settings are disabled, show News Letter screen
+      return NotificationScreen();
+    }
+  }
+
+  // New method to get the third screen icon based on payment settings
+  IconData _getThirdScreenIcon() {
+    // If payment settings are enabled, show send icon (Withdraw)
+    if (widget.loginResponse.paymentSettingExists == false) {
+      return Icons.send_rounded;
+    } else {
+      // If payment settings are disabled, show news icon (News Letter)
+      return Icons.newspaper_rounded;
+    }
+  }
+
+  // New method to get the third screen label based on payment settings
+  String _getThirdScreenLabel() {
+    // If payment settings are enabled, show "Withdraw"
+    if (widget.loginResponse.paymentSettingExists == false) {
+      return 'Withdraw';
+    } else {
+      // If payment settings are disabled, show "News"
+      return 'News';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final logRm = widget.loginResponse;
+
+    // Add build debug
+    print("🔄 IndexScreen building...");
+    print("   - Selected Index: $_selectedIndex");
+    print("   - Payment Setting: ${logRm.paymentSettingExists}");
+    print("   - Third Screen: ${_getThirdScreenLabel()}");
 
     return WillPopScope(
       onWillPop: () async {
@@ -114,14 +189,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
               children: [
                 _buildNavigator(0, HomeScreen(loginResponse: widget.loginResponse)),
                 _buildNavigator(1, _getMiddleScreen()),
-                _buildNavigator(
-                  2,
-                  WithdrawFromWallet(
-                    loginResponse: logRm,
-                    scaffoldKey: GlobalKey<ScaffoldState>(),
-                    navigationSource: NavigationSource.bottomBar,
-                  ),
-                ),
+                _buildNavigator(2, _getThirdScreen()), // Updated to use dynamic third screen
               ],
             ),
             // Floating Navigation Bar
@@ -184,7 +252,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
             ),
             _buildNavItem(
               index: 2,
-              icon: Icons.send_rounded,
+              icon: _getThirdScreenIcon(), // Dynamic icon based on payment settings
             ),
           ],
         ),
@@ -257,7 +325,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
       case 1:
         return widget.loginResponse.role == "student" ? 'Results' : 'Payment';
       case 2:
-        return 'Withdraw';
+        return _getThirdScreenLabel(); // Dynamic label based on payment settings
       default:
         return '';
     }

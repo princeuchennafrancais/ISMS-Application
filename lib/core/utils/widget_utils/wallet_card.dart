@@ -13,7 +13,7 @@ class WalletCard extends StatefulWidget {
   final String? balanceError;
   final VoidCallback? onRefreshBalance;
   final VoidCallback? onWithdraw;
-  final bool hasWallet; // New property to check if user has a wallet
+  final bool hasWallet;
   final LoginResponseModel loginResponseModel;
 
   const WalletCard({
@@ -23,7 +23,7 @@ class WalletCard extends StatefulWidget {
     this.balanceError,
     this.onRefreshBalance,
     this.onWithdraw,
-    this.hasWallet = true, // Default to true for backward compatibility
+    this.hasWallet = true,
     required this.loginResponseModel
   });
 
@@ -97,6 +97,121 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
   String _formatBalance() {
     if (widget.balance == null) return "0.00";
     return widget.balance!.toStringAsFixed(2);
+  }
+
+  // Widget for when payment settings are disabled
+  Widget _buildPaymentDisabledState() {
+    return Positioned(
+      top: 200.h,
+      left: 35.w,
+      right: 35.w,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Container(
+            constraints: BoxConstraints(
+              minHeight: 128.h,
+              maxHeight: 200.h,
+            ),
+            width: double.infinity,
+            padding: EdgeInsets.all(20.w),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white,
+                  Colors.grey[50]!,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.20),
+                  spreadRadius: 0,
+                  blurRadius: 30,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  spreadRadius: 0,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.grey.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.payment_outlined,
+                  size: 42.sp,
+                  color: Colors.orange.withOpacity(0.5),
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  "Wallet Service Comming soon",
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: 7.h),
+                Text(
+                  "Wallet services are currently unavailable. Please contact your school administrator.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey[600],
+                    fontFamily: 'Poppins',
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 10.h),
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16.sp,
+                        color: Colors.orange[700],
+                      ),
+                      SizedBox(width: 8.w),
+                      Text(
+                        "Payment Service: Unavailable",
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange[700],
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // Widget for when user doesn't have a wallet
@@ -236,7 +351,7 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
                 scale: widget.isLoadingBalance ? _pulseAnimation.value : 1.0,
                 child: Container(
                   constraints: BoxConstraints(
-                    minHeight: 90.h, // Increased height to accommodate buttons
+                    minHeight: 90.h,
                   ),
                   width: double.infinity,
                   padding: EdgeInsets.all(20.w),
@@ -647,6 +762,12 @@ class _WalletCardState extends State<WalletCard> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Check if payment settings are disabled
+    if (widget.loginResponseModel.paymentSettingExists = false) {
+      return _buildPaymentDisabledState();
+    }
+
+    // Otherwise, show normal wallet states
     return widget.hasWallet ? _buildWalletState() : _buildNoWalletState();
   }
 }
