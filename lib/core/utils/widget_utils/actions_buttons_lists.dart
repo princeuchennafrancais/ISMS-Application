@@ -7,6 +7,7 @@ import 'package:wallet/feautures/presentation/home/payment_screen.dart';
 import 'package:wallet/feautures/presentation/home/withdraw_from_wallet.dart';
 
 import '../../../feautures/presentation/home/notification_screen.dart';
+import '../../../feautures/presentation/home/school_fee.dart';
 import '../../../feautures/presentation/home/student_result_screen.dart';
 
 class ActionsButtonsLists extends StatefulWidget {
@@ -32,7 +33,6 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // First Button - Conditional based on role
           lrgm.role != "student"
               ? Expanded(
             child: GestureDetector(
@@ -72,10 +72,7 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
               },
             ),
           ),
-
-          SizedBox(width: 10.w), // Spacing between buttons
-
-          // Second Button - News Letter
+          SizedBox(width: 10.w),
           Expanded(
             child: GestureDetector(
               child: ActionsButton(
@@ -103,13 +100,12 @@ class _ActionsButtonsListsState extends State<ActionsButtonsLists> {
                 label: "Pay Fees",
               ),
               onTap: () {
-                // Add navigation for Pay Fees screen here
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(
-                //     builder: (context) => PayFeesScreen(),
-                //   ),
-                // );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SchoolFeesScreen(loginResponseModel: lrgm,),
+                  ),
+                );
               },
             ),
           ),

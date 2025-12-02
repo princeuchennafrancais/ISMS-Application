@@ -1,48 +1,73 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wallet/core/controllers/api_endpoints.dart';
-import 'package:wallet/core/controllers/school_service.dart';
-import 'package:wallet/core/utils/color_utils/color_util.dart';
-import 'package:wallet/feautures/presentation/home/notification_screen.dart';
+import 'package:wallet/feautures/presentation/home/payment_processing.dart';
+import 'dart:convert';
+
+import '../../../core/controllers/school_service.dart';
+import '../../../core/enum/navigation_source.dart';
+import '../../../core/models/login_model.dart';
+import '../../../core/utils/color_utils/color_util.dart';
+import '../../../core/utils/widget_utils/trial_custom_drawer.dart';
 
 class SchoolFeesScreen extends StatefulWidget {
-  const SchoolFeesScreen({super.key});
+  final LoginResponseModel loginResponseModel;
+  final NavigationSource navigationSource;
+
+  const SchoolFeesScreen({
+    super.key,
+    required this.loginResponseModel,
+    this.navigationSource = NavigationSource.other,
+  });
 
   @override
   State<SchoolFeesScreen> createState() => _SchoolFeesScreenState();
 }
 
 class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProviderStateMixin {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  bool _isLoading = true;
-  bool _isProcessingPayment = false;
-
-  String studentName = "N/A";
-  String regNo = "N/A";
-  String studentClass = "N/A";
+  // Controllers and selected values
+  String selectedSession = '';
+  String selectedSessionName = '';
+  String selectedTerm = '';
+  String selectedTermName = '';
+  String selectedClassm = '';
+  String selectedClassmName = '';
   String? schoolCode;
 
-  // Fee details
-  double totalFees = 0.0;
-  double paidFees = 0.0;
-  double outstandingFees = 0.0;
-  List<Map<String, dynamic>> feeBreakdown = [];
+  // Loading states
+  bool isLoading = false;
+  bool isLoadingSessions = false;
+  bool isLoadingClasses = false;
+  bool isLoadingFees = false;
 
-  // Payment amount controller
-  final TextEditingController _amountController = TextEditingController();
-  String selectedPaymentMethod = 'card';
+  // API data
+  List<Map<String, String>> sessions = [];
+  List<Map<String, String>> classes = [];
+
+  // Static terms data
+  final List<Map<String, String>> terms = [
+    {'id': '1', 'name': 'First Term'},
+    {'id': '2', 'name': 'Second Term'},
+    {'id': '3', 'name': 'Third Term'},
+  ];
+
+  // Fees details
+  Map<String, dynamic>? feesDetails;
+
+  // Track if fees have been fetched
+  bool showFeesDetails = false;
 
   // Animation controllers
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -55,7 +80,6 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
-    _amountController.dispose();
     super.dispose();
   }
 
@@ -75,11 +99,11 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _fadeController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOut,
     ));
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
+      begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
@@ -91,269 +115,1323 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
   }
 
   Future<void> _initializeData() async {
-    print("=== INITIALIZING FEES DATA ===");
+    final schoolData = await SchoolDataService.getSchoolData();
+    schoolCode = schoolData?.schoolCode ?? "";
+    await fetchSessions();
+    await fetchClasses();
+  }
+
+  // Fetch Sessions
+  Future<void> fetchSessions() async {
+    setState(() {
+      isLoadingSessions = true;
+    });
 
     try {
-      final schoolData = await SchoolDataService.getSchoolData();
+      print("🔄 Fetching sessions from: https://api.ceemact.com/class_api/getSessions");
 
-      if (mounted) {
-        setState(() {
-          schoolCode = schoolData?.schoolCode ?? "";
-        });
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
 
-        print("School code retrieved: $schoolCode");
+      final response = await http.get(
+        Uri.parse("https://api.ceemact.com/class_api/getSessions"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'scode': schoolCode ?? "",
+        },
+      ).timeout(const Duration(seconds: 30));
 
-        if (schoolCode != null && schoolCode!.isNotEmpty) {
-          await fetchFeesData();
-        } else {
-          print("❌ No school code found");
+      print("📥 Sessions Response Status: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final payload = responseData['payload'];
+
+        if (payload != null && payload['status'] == 1) {
+          final List<dynamic> sessionsData = payload['data'] ?? [];
+
           setState(() {
-            _isLoading = false;
+            sessions = sessionsData.map<Map<String, String>>((session) {
+              return {
+                'id': session['id'].toString(),
+                'name': session['name'] ?? 'Unknown Session',
+              };
+            }).toList();
           });
+
+          print("✅ Sessions loaded successfully: ${sessions.length} sessions");
+        } else {
+          print("❌ Sessions API Error: ${payload?['message']}");
+          _showErrorSnackbar(payload?['message'] ?? 'Failed to load sessions');
         }
+      } else {
+        print("❌ Sessions HTTP Error: ${response.statusCode}");
+        _showErrorSnackbar("Failed to load sessions: Server error ${response.statusCode}");
       }
-    } catch (e) {
-      print("❌ Error initializing data: $e");
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    } on SocketException catch (e) {
+      print("❌ Sessions Socket Exception: $e");
+      _showErrorSnackbar("Connection failed. Check your internet connection");
+    } on TimeoutException catch (e) {
+      print("❌ Sessions Timeout Exception: $e");
+      _showErrorSnackbar("Request timeout. Please try again");
+    } catch (error) {
+      print("❌ Sessions General Error: $error");
+      _showErrorSnackbar("Failed to load sessions. Please try again");
+    } finally {
+      setState(() {
+        isLoadingSessions = false;
+      });
     }
   }
 
-  Future<void> fetchFeesData() async {
-    print("=== FETCHING FEES DATA ===");
-    print("Using school code: $schoolCode");
-
-    if (schoolCode == null || schoolCode!.isEmpty) {
-      print("❌ Cannot fetch fees: No school code available");
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
+  // Fetch Classes
+  Future<void> fetchClasses() async {
+    setState(() {
+      isLoadingClasses = true;
+    });
 
     try {
+      print("🔄 Fetching classes from: https://api.ceemact.com/class_api/getClasses");
+
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
-
-      if (token == null) throw Exception("No auth token");
-
-      // Replace with your actual fees endpoint
-      final uri = Uri.parse("");
-      print("Making request to: $uri");
+      final token = prefs.getString('auth_token') ?? '';
 
       final response = await http.get(
-        uri,
+        Uri.parse("https://api.ceemact.com/class_api/getClasses"),
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
-          'scode': schoolCode!,
+          'scode': schoolCode ?? "",
         },
-      ).timeout(Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 30));
 
-      print("Response status: ${response.statusCode}");
-      print("Response body: ${response.body}");
+      print("📥 Classes Response Status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
         String responseBody = response.body.trim();
 
-        if (responseBody.isEmpty) {
-          throw Exception("Empty response from server");
+        // Extract valid JSON from response
+        int firstBraceIndex = responseBody.indexOf('{');
+        int braceCount = 0;
+        int endIndex = firstBraceIndex;
+
+        for (int i = firstBraceIndex; i < responseBody.length; i++) {
+          if (responseBody[i] == '{') {
+            braceCount++;
+          } else if (responseBody[i] == '}') {
+            braceCount--;
+            if (braceCount == 0) {
+              endIndex = i;
+              break;
+            }
+          }
         }
 
-        int jsonStartIndex = responseBody.indexOf('{');
-        if (jsonStartIndex != -1) {
-          String jsonString = responseBody.substring(jsonStartIndex);
-          final data = jsonDecode(jsonString);
+        String validJsonString = responseBody.substring(firstBraceIndex, endIndex + 1);
+        final responseData = jsonDecode(validJsonString);
 
-          Map<String, dynamic> dataSource;
-          if (data.containsKey('state') && data['state']['status'] == 1) {
-            final payload = data['payload'];
-            if (payload != null && payload['status'] == 1) {
-              dataSource = payload;
-            } else {
-              throw Exception("Payload error: ${payload?['message'] ?? 'Unknown error'}");
-            }
-          } else if (data['status'] == 1) {
-            dataSource = data;
-          } else {
-            throw Exception("API returned status: ${data['status']}");
-          }
+        // Check if this is the direct format or nested in payload
+        Map<String, dynamic> dataSource;
+        if (responseData.containsKey('payload')) {
+          dataSource = responseData['payload'];
+        } else {
+          dataSource = responseData;
+        }
 
-          final feesData = dataSource['data'];
+        if (dataSource['status'] == 1) {
+          final List<dynamic> classesData = dataSource['data'] ?? [];
 
           setState(() {
-            studentName = feesData['student_name'] ?? "N/A";
-            regNo = feesData['reg_no'] ?? "N/A";
-            studentClass = feesData['class_name'] ?? "N/A";
-            totalFees = (feesData['total_fees'] ?? 0).toDouble();
-            paidFees = (feesData['paid_fees'] ?? 0).toDouble();
-            outstandingFees = totalFees - paidFees;
-
-            // Parse fee breakdown
-            if (feesData['breakdown'] != null) {
-              feeBreakdown = List<Map<String, dynamic>>.from(feesData['breakdown']);
-            }
-
-            _isLoading = false;
+            classes = classesData.map<Map<String, String>>((classItem) {
+              return {
+                'id': classItem['id'].toString(),
+                'name': classItem['name'] ?? 'Unknown Class',
+              };
+            }).toList();
           });
 
-          print("✅ Fees data loaded successfully");
+          print("✅ Classes loaded successfully: ${classes.length} classes");
         } else {
-          throw Exception("Server returned non-JSON response");
+          print("❌ Classes API Error: ${dataSource['message']}");
+          _showErrorSnackbar(dataSource['message'] ?? 'Failed to load classes');
         }
       } else {
-        throw Exception("Server error ${response.statusCode}");
+        print("❌ Classes HTTP Error: ${response.statusCode}");
+        _showErrorSnackbar("Failed to load classes: Server error ${response.statusCode}");
       }
+    } on SocketException catch (e) {
+      print("❌ Classes Socket Exception: $e");
+      _showErrorSnackbar("Connection failed. Check your internet connection");
     } on TimeoutException catch (e) {
-      print("❌ Request timeout: $e");
+      print("❌ Classes Timeout Exception: $e");
+      _showErrorSnackbar("Request timeout. Please try again");
+    } catch (error) {
+      print("❌ Classes General Error: $error");
+      _showErrorSnackbar("Failed to load classes. Please try again");
+    } finally {
       setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print("❌ Fees fetch error: $e");
-      setState(() {
-        _isLoading = false;
+        isLoadingClasses = false;
       });
     }
   }
 
-  Future<void> _processPayment() async {
-    if (_amountController.text.isEmpty) {
-      _showErrorDialog("Please enter an amount");
-      return;
-    }
-
-    double amount = double.tryParse(_amountController.text) ?? 0;
-
-    if (amount <= 0) {
-      _showErrorDialog("Please enter a valid amount");
-      return;
-    }
-
-    if (amount > outstandingFees) {
-      _showErrorDialog("Amount exceeds outstanding fees");
-      return;
-    }
-
+  // Fetch Fees Details
+  Future<void> fetchFeesDetails() async {
     setState(() {
-      _isProcessingPayment = true;
+      isLoadingFees = true;
+      feesDetails = null;
     });
 
     try {
+      print("🔄 Fetching fees details from: https://rosarycollegenise.com/api/payment_api/getCustompayment");
+
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final token = prefs.getString('auth_token') ?? '';
 
-      if (token == null) throw Exception("No auth token");
+      final Map<String, dynamic> requestBody = {
+        'session': selectedSession,
+        'term': selectedTerm,
+        'classm': selectedClassm,
+      };
 
-      // Replace with your actual payment endpoint
-      final uri = Uri.parse("APIEndpoints.initiatePaymentEndpoint");
+      print("📤 Request Body: ${jsonEncode(requestBody)}");
 
       final response = await http.post(
-        uri,
+        Uri.parse("https://rosarycollegenise.com/api/payment_api/getCustompayment"),
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
-          'scode': schoolCode!,
-          'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'amount': amount,
-          'payment_method': selectedPaymentMethod,
-          'reg_no': regNo,
-        }),
-      ).timeout(Duration(seconds: 30));
+        body: jsonEncode(requestBody),
+      ).timeout(const Duration(seconds: 30));
+
+      print("📥 Fees Response Status: ${response.statusCode}");
+      print("📥 Fees Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
 
-        if (data['status'] == 1) {
-          _showSuccessDialog(amount);
-          await fetchFeesData(); // Refresh fees data
+        if (responseData['status'] == 1) {
+          setState(() {
+            feesDetails = responseData;
+            showFeesDetails = true; // Set to true when fees are fetched
+          });
+          print("✅ Fees details loaded successfully");
         } else {
-          _showErrorDialog(data['message'] ?? 'Payment failed');
+          print("❌ Fees API Error: ${responseData['message']}");
+          _showErrorSnackbar(responseData['message'] ?? 'Failed to load fees details');
         }
       } else {
-        _showErrorDialog('Payment processing failed');
+        print("❌ Fees HTTP Error: ${response.statusCode}");
+        _showErrorSnackbar("Failed to load fees details: Server error ${response.statusCode}");
       }
-    } catch (e) {
-      print("❌ Payment error: $e");
-      _showErrorDialog('An error occurred. Please try again.');
+    } on SocketException catch (e) {
+      print("❌ Fees Socket Exception: $e");
+      _showErrorSnackbar("Connection failed. Check your internet connection");
+    } on TimeoutException catch (e) {
+      print("❌ Fees Timeout Exception: $e");
+      _showErrorSnackbar("Request timeout. Please try again");
+    } catch (error) {
+      print("❌ Fees General Error: $error");
+      _showErrorSnackbar("Failed to load fees details. Please try again");
     } finally {
       setState(() {
-        _isProcessingPayment = false;
+        isLoadingFees = false;
       });
     }
   }
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-        title: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 28.sp),
-            SizedBox(width: 12.w),
-            Text('Error', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600)),
-          ],
+  // Make Payment
+  void _makePayment() {
+    if (feesDetails == null || feesDetails!['status'] != 1) return;
+
+    // Extract fees items
+    final List<dynamic> feesList = feesDetails!['data'] ?? [];
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentProcessingScreen(
+          feesDetails: feesDetails!,
+          session: selectedSession,
+          term: selectedTerm,
+          classm: selectedClassm,
+          sessionName: selectedSessionName,
+          termName: selectedTermName,
+          className: selectedClassmName,
         ),
-        content: Text(message, style: TextStyle(fontSize: 14.sp)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK', style: TextStyle(color: AppColors.primaryBlue)),
-          ),
-        ],
       ),
     );
   }
 
-  void _showSuccessDialog(double amount) {
-    showDialog(
+  bool _canFetchFees() {
+    return selectedSession.isNotEmpty &&
+        selectedTerm.isNotEmpty &&
+        selectedClassm.isNotEmpty &&
+        !isLoadingFees;
+  }
+
+  bool _canMakePayment() {
+    return feesDetails != null &&
+        feesDetails!['status'] == 1 &&
+        !isLoading;
+  }
+
+  void _selectItem(String type, String id, String name) {
+    setState(() {
+      switch (type) {
+        case 'session':
+          selectedSession = id;
+          selectedSessionName = name;
+          // Clear fees details when session changes
+          feesDetails = null;
+          showFeesDetails = false;
+          break;
+        case 'term':
+          selectedTerm = id;
+          selectedTermName = name;
+          // Clear fees details when term changes
+          feesDetails = null;
+          showFeesDetails = false;
+          break;
+        case 'classm':
+          selectedClassm = id;
+          selectedClassmName = name;
+          // Clear fees details when class changes
+          feesDetails = null;
+          showFeesDetails = false;
+          break;
+      }
+    });
+  }
+
+  void _showDropdown(BuildContext context, String type) {
+    List<Map<String, String>> items;
+    String title;
+    IconData titleIcon;
+
+    switch (type) {
+      case 'session':
+        items = sessions;
+        title = 'Academic Session';
+        titleIcon = Icons.calendar_today_outlined;
+        break;
+      case 'term':
+        items = terms;
+        title = 'Term';
+        titleIcon = Icons.date_range_outlined;
+        break;
+      case 'classm':
+        items = classes;
+        title = 'Class';
+        titleIcon = Icons.school_outlined;
+        break;
+      default:
+        return;
+    }
+
+    if ((type == 'session' && isLoadingSessions) ||
+        (type == 'classm' && isLoadingClasses)) {
+      _showErrorSnackbar('Loading data, please wait...');
+      return;
+    }
+
+    if (items.isEmpty && type != 'term') {
+      _showErrorSnackbar('No ${type}s available. Please check your connection and try again.');
+      return;
+    }
+
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-        title: Row(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(25.r),
+            topRight: Radius.circular(25.r),
+          ),
+        ),
+        child: Column(
           children: [
-            Icon(Icons.check_circle_outline, color: Colors.green, size: 28.sp),
-            SizedBox(width: 12.w),
-            Text('Success', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600)),
+            Container(
+              width: 50.w,
+              height: 5.h,
+              margin: EdgeInsets.only(top: 12.h),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(3.r),
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.all(25.w),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryBlue,
+                    AppColors.primaryBlue.withOpacity(0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(25.r),
+                  topRight: Radius.circular(25.r),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Icon(
+                      titleIcon,
+                      color: Colors.white,
+                      size: 24.sp,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Text(
+                      'Select $title',
+                      style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.close_rounded, color: Colors.white, size: 20.sp),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: items.isEmpty
+                  ? Container(
+                padding: EdgeInsets.all(40.w),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(20.w),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: Icon(
+                        Icons.inbox_outlined,
+                        size: 40.sp,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    SizedBox(height: 20.h),
+                    Text(
+                      'No items available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      'Please check your connection and try again',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[500],
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : ListView.builder(
+                padding: EdgeInsets.all(20.w),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(
+                        color: Colors.grey[200]!,
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          _selectItem(type, item['id']!, item['name']!);
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(16.r),
+                        child: Padding(
+                          padding: EdgeInsets.all(20.w),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12.w,
+                                height: 12.h,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primaryBlue,
+                                      AppColors.primaryBlue.withOpacity(0.7),
+                                    ],
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: Text(
+                                  item['name']!,
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: Colors.grey[400],
+                                size: 16.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
-        content: Text(
-          'Payment of ₦${amount.toStringAsFixed(2)} processed successfully!',
-          style: TextStyle(fontSize: 14.sp),
-        ),
-        actions: [
-          TextButton(
+      ),
+    );
+  }
+
+  Widget _buildAppBarLeading() {
+    switch (widget.navigationSource) {
+      case NavigationSource.bottomBar:
+        return Container(
+          margin: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              )
+          ),
+          child: IconButton(
+            icon: Icon(Icons.menu_rounded, color: Colors.white, size: 24.sp),
             onPressed: () {
-              Navigator.pop(context);
-              _amountController.clear();
+              if (mounted && _scaffoldKey.currentState != null) {
+                _scaffoldKey.currentState!.openDrawer();
+              }
             },
-            child: Text('OK', style: TextStyle(color: AppColors.primaryBlue)),
+          ),
+        );
+      case NavigationSource.button:
+      case NavigationSource.drawer:
+      case NavigationSource.other:
+      default:
+        return IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
+          onPressed: () => Navigator.pop(context),
+        );
+    }
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String hint,
+    required String value,
+    required IconData icon,
+    VoidCallback? onTap,
+    bool isLoading = false,
+  }) {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.only(bottom: 20.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16.r),
+              color: Colors.grey[50],
+              border: Border.all(
+                color: onTap == null ? Colors.grey.shade300 :
+                value.isNotEmpty ? AppColors.primaryBlue.withOpacity(0.3) : Colors.grey.shade300,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(16.r),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: onTap == null
+                              ? Colors.grey.withOpacity(0.3)
+                              : AppColors.primaryBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: onTap == null ? Colors.grey : AppColors.primaryBlue,
+                          size: 20.sp,
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Text(
+                          value.isEmpty ? hint : value,
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            color: value.isEmpty ? Colors.grey[500] : Colors.black87,
+                            fontWeight: value.isEmpty ? FontWeight.w400 : FontWeight.w500,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                      if (isLoading)
+                        SizedBox(
+                          width: 20.w,
+                          height: 20.h,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primaryBlue,
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.expand_more_rounded,
+                          color: onTap == null ? Colors.grey : Colors.grey.shade600,
+                          size: 24.sp,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String toTitleCase(String text) {
-    if (text.isEmpty) return text;
-    return text.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+  Widget _buildFeesDetails() {
+    if (feesDetails == null) return Container();
+
+    if (isLoadingFees) {
+      return Container(
+        margin: EdgeInsets.only(top: 20.h),
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              CircularProgressIndicator(
+                color: AppColors.primaryBlue,
+              ),
+              SizedBox(height: 15.h),
+              Text(
+                'Loading fees details...',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (feesDetails!['status'] != 1) {
+      return Container(
+        margin: EdgeInsets.only(top: 20.h),
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: Colors.red.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 60.w,
+              height: 60.h,
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 30.sp,
+              ),
+            ),
+            SizedBox(height: 15.h),
+            Text(
+              'No Fees Details Found',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              feesDetails!['message'] ?? 'No fees details available for the selected parameters',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Extract fees data
+    final List<dynamic> feesList = feesDetails!['data'] ?? [];
+
+    if (feesList.isEmpty) {
+      return Container(
+        margin: EdgeInsets.only(top: 20.h),
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 60.w,
+              height: 60.h,
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.info_outline,
+                color: Colors.blue,
+                size: 30.sp,
+              ),
+            ),
+            SizedBox(height: 15.h),
+            Text(
+              'No Fees Items',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'No fees items found for this selection',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Calculate total amount
+    double totalAmount = 0;
+    for (var item in feesList) {
+      if (item is Map && item['amount'] != null) {
+        try {
+          totalAmount += double.parse(item['amount'].toString());
+        } catch (e) {
+          print("❌ Error parsing amount: ${item['amount']}");
+        }
+      }
+    }
+
+    return Container(
+      margin: EdgeInsets.only(top: 20.h),
+      child: Column(
+        children: [
+          // Header for fees breakdown
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 4.w),
+            child: Row(
+              children: [
+                Text(
+                  'Fees Breakdown',
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  height: 35.h,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: AppColors.primaryBlue.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        showFeesDetails = false;
+                        feesDetails = null;
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          color: AppColors.primaryBlue,
+                          size: 14.sp,
+                        ),
+                        SizedBox(width: 6.w),
+                        Text(
+                          "Change Selection",
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontFamily: "Poppins",
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 20.h),
+
+          // Selected parameters card
+          Container(
+            padding: EdgeInsets.all(20.w),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryBlue.withOpacity(0.1),
+                  AppColors.primaryBlue.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(
+                color: AppColors.primaryBlue.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildParameterItem(Icons.calendar_today_outlined, 'Session', selectedSessionName),
+                _buildParameterItem(Icons.date_range_outlined, 'Term', selectedTermName),
+                _buildParameterItem(Icons.school_outlined, 'Class', selectedClassmName),
+              ],
+            ),
+          ),
+          SizedBox(height: 25.h),
+
+          // Fees items list
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: feesList.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12.h),
+                  padding: EdgeInsets.all(20.w),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white,
+                        Colors.grey[50]!,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.08),
+                        spreadRadius: 0,
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.grey.withOpacity(0.05),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 45.w,
+                        height: 45.h,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.primaryBlue.withOpacity(0.15),
+                              AppColors.primaryBlue.withOpacity(0.05),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primaryBlue.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16.sp,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['component']?.toString().toUpperCase() ?? 'FEE ITEM',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                fontFamily: 'Poppins',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 6.h),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryBlue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Text(
+                                    'Session: ${item['session'] ?? 'N/A'}',
+                                    style: TextStyle(
+                                      fontSize: 10.sp,
+                                      color: AppColors.primaryBlue,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 6.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Text(
+                                    'Term: ${item['term'] ?? 'N/A'}',
+                                    style: TextStyle(
+                                      fontSize: 10.sp,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Text(
+                        '₦${item['amount'] ?? '0.00'}',
+                        style: TextStyle(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryBlue,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          SizedBox(height: 25.h),
+
+          // Total amount card
+          Container(
+            padding: EdgeInsets.all(25.w),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryBlue.withOpacity(0.1),
+                  AppColors.primaryBlue.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                color: AppColors.primaryBlue.withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOTAL AMOUNT',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      '${feesList.length} item${feesList.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₦${totalAmount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 28.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryBlue,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Text(
+                        'Payable Now',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 25.h),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParameterItem(IconData icon, String title, String value) {
+    return Column(
+      children: [
+        Container(
+          width: 50.w,
+          height: 50.h,
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.primaryBlue,
+            size: 22.sp,
+          ),
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 12.sp,
+            color: Colors.grey[600],
+          ),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFetchFeesButton() {
+    if (showFeesDetails) return SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      height: 56.h,
+      margin: EdgeInsets.only(top: 10.h),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16.r),
+        gradient: _canFetchFees()
+            ? LinearGradient(
+          colors: [
+            AppColors.primaryBlue,
+            AppColors.primaryBlue.withOpacity(0.8),
+          ],
+        )
+            : null,
+        color: _canFetchFees() ? null : Colors.grey[300],
+        boxShadow: _canFetchFees()
+            ? [
+          BoxShadow(
+            color: AppColors.primaryBlue.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _canFetchFees() ? fetchFeesDetails : null,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Center(
+            child: isLoadingFees
+                ? SizedBox(
+              width: 24.w,
+              height: 24.h,
+              child: const CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.5,
+              ),
+            )
+                : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_rounded,
+                  color: _canFetchFees() ? Colors.white : Colors.grey[600],
+                  size: 22.sp,
+                ),
+                SizedBox(width: 12.w),
+                Text(
+                  'View Fees Details',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: _canFetchFees() ? Colors.white : Colors.grey[600],
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMakePaymentButton() {
+    if (feesDetails == null || feesDetails!['status'] != 1) {
+      return Container();
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 56.h,
+      margin: EdgeInsets.only(top: 20.h),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16.r),
+        gradient: LinearGradient(
+          colors: [
+            Colors.green,
+            Colors.green.withOpacity(0.8),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _makePayment,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.payment_rounded,
+                  color: Colors.white,
+                  size: 22.sp,
+                ),
+                SizedBox(width: 12.w),
+                Text(
+                  'Make Payment',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final userData = widget.loginResponseModel.data;
+
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(70.h),
         child: Container(
@@ -378,19 +1456,9 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
             backgroundColor: Colors.transparent,
             elevation: 0,
             centerTitle: true,
-            leading: Container(
-              margin: EdgeInsets.all(8.w),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
+            leading: _buildAppBarLeading(),
             title: Text(
-              'School Fees Payment',
+              'School Fees',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20.sp,
@@ -398,67 +1466,34 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
                 fontFamily: 'Poppins',
               ),
             ),
-            actions: [
-              Container(
-                margin: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: IconButton(
-                  icon: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.white,
-                        size: 22.sp,
-                      ),
-                      Positioned(
-                        top: -2,
-                        right: -2,
-                        child: Container(
-                          width: 8.w,
-                          height: 8.h,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                    );
-                  },
-                ),
-              ),
-            ],
           ),
         ),
       ),
-      body: _isLoading
-          ? _buildLoadingState()
-          : FadeTransition(
+      drawer: TrialCustomDrawer(
+        loginResponseModel: widget.loginResponseModel,
+        profPic: userData?.fpicture ?? "asset/images/Student.png",
+        userName: "${userData?.firstname} ${userData?.lastname}" ?? "Student",
+        adno: userData?.adno ?? "",
+      ),
+      body: FadeTransition(
         opacity: _fadeAnimation,
         child: SlideTransition(
           position: _slideAnimation,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // _buildHeaderSection(),
-                _buildFeesOverviewSection(),
-                _buildPaymentSection(),
-                SizedBox(height: 120.h),
-              ],
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await fetchSessions();
+              await fetchClasses();
+            },
+            color: AppColors.primaryBlue,
+            backgroundColor: Colors.white,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildHeaderSection(),
+                  _buildContentSection(),
+                ],
+              ),
             ),
           ),
         ),
@@ -466,203 +1501,55 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
     );
   }
 
-  Widget _buildLoadingState() {
-    return Container(
-      height: MediaQuery.of(context).size.height,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(20.w),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: AppColors.primaryBlue,
-              ),
-            ),
-            SizedBox(height: 24.h),
-            Text(
-              'Loading Fees Information...',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primaryBlue,
-                fontFamily: 'Poppins',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  //
-  // Widget _buildHeaderSection() {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: EdgeInsets.all(25.w),
-  //     decoration: BoxDecoration(
-  //       gradient: LinearGradient(
-  //         begin: Alignment.topLeft,
-  //         end: Alignment.bottomRight,
-  //         colors: [
-  //           AppColors.primaryBlue,
-  //           AppColors.primaryBlue.withOpacity(0.8),
-  //         ],
-  //       ),
-  //     ),
-  //     child: Column(
-  //       children: [
-  //         Container(
-  //           padding: EdgeInsets.all(16.w),
-  //           decoration: BoxDecoration(
-  //             shape: BoxShape.circle,
-  //             color: Colors.white.withOpacity(0.2),
-  //             border: Border.all(
-  //               color: Colors.white.withOpacity(0.3),
-  //               width: 2,
-  //             ),
-  //           ),
-  //           child: Icon(
-  //             Icons.account_balance_wallet_outlined,
-  //             size: 48.sp,
-  //             color: Colors.white,
-  //           ),
-  //         ),
-  //         SizedBox(height: 20.h),
-  //         Text(
-  //           toTitleCase(studentName),
-  //           textAlign: TextAlign.center,
-  //           style: TextStyle(
-  //             fontSize: 22.sp,
-  //             fontWeight: FontWeight.w700,
-  //             color: Colors.white,
-  //             fontFamily: 'Poppins',
-  //             letterSpacing: 0.5,
-  //           ),
-  //         ),
-  //         SizedBox(height: 8.h),
-  //         Container(
-  //           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-  //           decoration: BoxDecoration(
-  //             color: Colors.white.withOpacity(0.2),
-  //             borderRadius: BorderRadius.circular(20.r),
-  //             border: Border.all(color: Colors.white.withOpacity(0.3)),
-  //           ),
-  //           child: Text(
-  //             '$regNo • $studentClass',
-  //             style: TextStyle(
-  //               fontSize: 14.sp,
-  //               fontWeight: FontWeight.w500,
-  //               color: Colors.white,
-  //               fontFamily: 'Poppins',
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  Widget _buildFeesOverviewSection() {
+  Widget _buildHeaderSection() {
     return Container(
       width: double.infinity,
-      margin: EdgeInsets.all(20.w),
-      padding: EdgeInsets.all(24.w),
+      padding: EdgeInsets.only(top: 30.w, left: 30.w, right: 30.w, bottom: 40.w),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppColors.primaryBlue,
-            AppColors.primaryBlue.withOpacity(0.9),
+            AppColors.primaryBlue.withOpacity(0.8),
           ],
         ),
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            'Outstanding Balance',
-            style: TextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.9),
-              fontFamily: 'Poppins',
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            '₦${outstandingFees.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 36.sp,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              fontFamily: 'Poppins',
-              letterSpacing: 1,
-            ),
-          ),
-          SizedBox(height: 24.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildFeeStatCard(
-                'Total Fees',
-                '₦${totalFees.toStringAsFixed(2)}',
-                Icons.receipt_long_outlined,
-              ),
-              Container(
-                width: 1,
-                height: 50.h,
-                color: Colors.white.withOpacity(0.3),
-              ),
-              _buildFeeStatCard(
-                'Paid',
-                '₦${paidFees.toStringAsFixed(2)}',
-                Icons.check_circle_outline,
-              ),
-            ],
-          ),
-          SizedBox(height: 16.h),
           Container(
-            width: double.infinity,
-            height: 8.h,
+            padding: EdgeInsets.all(16.w),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(4.r),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
             ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: totalFees > 0 ? (paidFees / totalFees).clamp(0.0, 1.0) : 0.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4.r),
-                ),
-              ),
+            child: Icon(
+              Icons.payment_outlined,
+              color: Colors.white,
+              size: 40.sp,
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Text(
+            'School Fees Payment',
+            style: TextStyle(
+              fontSize: 28.sp,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontFamily: 'Poppins',
+              letterSpacing: 0.5,
             ),
           ),
           SizedBox(height: 8.h),
           Text(
-            '${totalFees > 0 ? ((paidFees / totalFees) * 100).toStringAsFixed(1) : '0'}% Paid',
+            'Select academic details to view your school fees breakdown',
             style: TextStyle(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.9),
+              fontSize: 16.sp,
+              color: Colors.white.withOpacity(0.8),
               fontFamily: 'Poppins',
+              height: 1.4,
             ),
           ),
         ],
@@ -670,267 +1557,146 @@ class _SchoolFeesScreenState extends State<SchoolFeesScreen> with TickerProvider
     );
   }
 
-  Widget _buildFeeStatCard(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: Colors.white.withOpacity(0.9),
-          size: 24.sp,
+  Widget _buildContentSection() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(35.r),
+          topRight: Radius.circular(35.r),
         ),
-        SizedBox(height: 8.h),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(30.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSelectionHeader(),
+            SizedBox(height: 30.h),
+
+            // Show dropdowns only when fees haven't been fetched yet
+            if (!showFeesDetails) ...[
+              _buildDropdownField(
+                label: 'Academic Session',
+                hint: 'Select academic session',
+                value: selectedSessionName,
+                icon: Icons.calendar_today_outlined,
+                onTap: () => _showDropdown(context, 'session'),
+                isLoading: isLoadingSessions,
+              ),
+              _buildDropdownField(
+                label: 'Term',
+                hint: 'Select term',
+                value: selectedTermName,
+                icon: Icons.date_range_outlined,
+                onTap: () => _showDropdown(context, 'term'),
+              ),
+              _buildDropdownField(
+                label: 'Class',
+                hint: 'Select class',
+                value: selectedClassmName,
+                icon: Icons.school_outlined,
+                onTap: () => _showDropdown(context, 'classm'),
+                isLoading: isLoadingClasses,
+              ),
+              SizedBox(height: 20.h),
+            ],
+
+            _buildFetchFeesButton(),
+            _buildFeesDetails(),
+            _buildMakePaymentButton(),
+            SizedBox(height: 40.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+          decoration: BoxDecoration(
+            color: AppColors.primaryBlue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: Text(
+            showFeesDetails ? 'FEES SUMMARY' : 'FEES SELECTION',
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryBlue,
+              letterSpacing: 1.2,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ),
+        SizedBox(height: 12.h),
         Text(
-          label,
+          showFeesDetails ? 'Fees Breakdown' : 'Choose Parameters',
           style: TextStyle(
-            fontSize: 12.sp,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withOpacity(0.8),
+            fontSize: 24.sp,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
             fontFamily: 'Poppins',
           ),
         ),
-        SizedBox(height: 4.h),
+        SizedBox(height: 6.h),
         Text(
-          value,
+          showFeesDetails
+              ? 'Review your school fees breakdown and make payment'
+              : 'Select academic parameters to view your school fees breakdown',
           style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
+            fontSize: 14.sp,
+            color: Colors.grey[600],
             fontFamily: 'Poppins',
+            height: 1.4,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPaymentSection() {
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.symmetric(horizontal: 20.w),
-      padding: EdgeInsets.all(24.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Icon(
-                  Icons.payment,
-                  color: AppColors.primaryBlue,
-                  size: 20.sp,
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Text(
-                'Make Payment',
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 24.h),
-          Text(
-            'Amount to Pay',
-            style: TextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              fontFamily: 'Poppins',
-            ),
-          ),
-          SizedBox(height: 12.h),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              decoration: InputDecoration(
-                hintText: '0.00',
-                prefixText: '₦ ',
-                prefixStyle: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryBlue,
-                  fontFamily: 'Poppins',
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-              ),
-            ),
-          ),
-          SizedBox(height: 12.h),
-          Wrap(
-            spacing: 8.w,
-            children: [
-              _buildQuickAmountChip(5000),
-              _buildQuickAmountChip(10000),
-              _buildQuickAmountChip(20000),
-              _buildQuickAmountChip(outstandingFees, label: 'Full'),
-            ],
-          ),
-          SizedBox(height: 24.h),
-          Text(
-            'Payment Method',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              fontFamily: 'Poppins',
-            ),
-          ),
-          SizedBox(height: 12.h),
-          _buildPaymentMethodCard(
-            'wallet',
-            'Wallet',
-            Icons.account_balance_wallet,
-          ),
-          SizedBox(height: 30.h),
-          SizedBox(
-            width: double.infinity,
-            height: 56.h,
-            child: ElevatedButton(
-              onPressed: _isProcessingPayment ? null : _processPayment,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                elevation: 3,
-              ),
-              child: _isProcessingPayment
-                  ? SizedBox(
-                height: 24.h,
-                width: 24.w,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : Text(
-                'Proceed to Payment',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickAmountChip(double amount, {String? label}) {
-    return ActionChip(
-      label: Text(
-        label ?? '₦${amount.toStringAsFixed(0)}',
-        style: TextStyle(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'Poppins',
-        ),
-      ),
-      onPressed: () {
-        setState(() {
-          _amountController.text = amount.toStringAsFixed(2);
-        });
-      },
-      backgroundColor: Colors.grey[100],
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.r),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodCard(String value, String label, IconData icon) {
-    bool isSelected = selectedPaymentMethod == value;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedPaymentMethod = value;
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.all(16.w),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryBlue.withOpacity(0.1) : Colors.grey[50],
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryBlue : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
+  void _showSuccessSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(10.w),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryBlue.withOpacity(0.2)
-                    : Colors.grey[200],
-                borderRadius: BorderRadius.circular(10.r),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? AppColors.primaryBlue : Colors.grey[600],
-                size: 24.sp,
-              ),
-            ),
-            SizedBox(width: 16.w),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? AppColors.primaryBlue : Colors.grey[700],
-                  fontFamily: 'Poppins',
-                ),
-              ),
-            ),
-            if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: AppColors.primaryBlue,
-                size: 24.sp,
-              ),
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 20.sp),
+            SizedBox(width: 12.w),
+            Expanded(child: Text(message, style: TextStyle(fontFamily: 'Poppins'))),
           ],
         ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_rounded, color: Colors.white, size: 20.sp),
+            SizedBox(width: 12.w),
+            Expanded(child: Text(message, style: TextStyle(fontFamily: 'Poppins'))),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       ),
     );
   }

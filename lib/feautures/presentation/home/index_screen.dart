@@ -26,6 +26,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
   late int _selectedIndex;
   late AnimationController _animationController;
   late AnimationController _fabAnimController;
+  bool _showBottomBar = true; // Track bottom bar visibility
 
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
     GlobalKey<NavigatorState>(),
@@ -62,13 +63,40 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
+  void _updateBottomBarVisibility() {
+    final isAtRoot = _isAtRootRoute(_selectedIndex);
+    if (_showBottomBar != isAtRoot) {
+      setState(() {
+        _showBottomBar = isAtRoot;
+      });
+
+      // Animate the bottom bar in when it becomes visible
+      if (isAtRoot) {
+        _fabAnimController.reset();
+        _fabAnimController.forward();
+      }
+    }
+  }
+
   void _onItemTapped(int index) {
     if (_selectedIndex != index) {
       _animationController.forward(from: 0.0);
       setState(() {
         _selectedIndex = index;
       });
+      // Update bottom bar visibility when switching tabs
+      _updateBottomBarVisibility();
     }
+  }
+
+  bool _isAtRootRoute(int index) {
+    final navigator = _navigatorKeys[index].currentState;
+    if (navigator == null) return true;
+
+    // Check if we're at the first route (root)
+    // If canPop() returns false, we're at the root/main screen
+    // If canPop() returns true, we've navigated deeper
+    return navigator.canPop() == false;
   }
 
   Widget _getMiddleScreen() {
@@ -103,6 +131,9 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
             return false;
           }
           return true;
+        } else {
+          // Update bottom bar visibility after popping
+          _updateBottomBarVisibility();
         }
         return false;
       },
@@ -124,20 +155,26 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
                 ),
               ],
             ),
-            // Floating Navigation Bar
+            // Floating Navigation Bar - Only show when at root route
             Positioned(
               left: 20.w,
               right: 20.w,
               bottom: 20.h + MediaQuery.viewPaddingOf(context).bottom,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 1),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: _fabAnimController,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: _buildFloatingNavBar(logRm),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _showBottomBar ? 1.0 : 0.0,
+                child: _showBottomBar
+                    ? SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 1),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: _fabAnimController,
+                    curve: Curves.easeOutCubic,
+                  )),
+                  child: _buildFloatingNavBar(logRm),
+                )
+                    : SizedBox.shrink(),
               ),
             ),
           ],
@@ -266,6 +303,7 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
   Widget _buildNavigator(int index, Widget child) {
     return Navigator(
       key: _navigatorKeys[index],
+      observers: [_NavigatorObserver(onRouteChange: _updateBottomBarVisibility)],
       onGenerateRoute: (settings) {
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => child,
@@ -295,5 +333,36 @@ class _IndexScreenState extends State<IndexScreen> with TickerProviderStateMixin
         );
       },
     );
+  }
+}
+
+// Custom Navigator Observer to detect route changes
+class _NavigatorObserver extends NavigatorObserver {
+  final VoidCallback onRouteChange;
+
+  _NavigatorObserver({required this.onRouteChange});
+
+  @override
+  void didPush(Route route, Route? previousRoute) {
+    super.didPush(route, previousRoute);
+    onRouteChange();
+  }
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    super.didPop(route, previousRoute);
+    onRouteChange();
+  }
+
+  @override
+  void didRemove(Route route, Route? previousRoute) {
+    super.didRemove(route, previousRoute);
+    onRouteChange();
+  }
+
+  @override
+  void didReplace({Route? newRoute, Route? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    onRouteChange();
   }
 }

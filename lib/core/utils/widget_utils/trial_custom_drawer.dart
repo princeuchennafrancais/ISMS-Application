@@ -10,6 +10,7 @@ import 'package:wallet/feautures/presentation/home/notification_screen.dart';
 import 'package:wallet/feautures/presentation/home/profile_screen.dart';
 
 import '../../../feautures/presentation/home/school_fee.dart';
+import '../../../feautures/presentation/home/student_verification.dart';
 
 class TrialCustomDrawer extends StatefulWidget {
   final String userName;
@@ -79,6 +80,22 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
           word.substring(1).toLowerCase();
     })
         .join(' ');
+  }
+
+  // Helper method to navigate within the current tab's nested navigator
+  void _navigateInCurrentTab(Widget screen) {
+    // Close the drawer first
+    Navigator.of(context).pop();
+
+    // Small delay to ensure drawer closes smoothly
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        // Push to the current tab's navigator (not the root navigator)
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => screen),
+        );
+      }
+    });
   }
 
   void _showLogoutConfirmation() {
@@ -378,57 +395,41 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
         'icon': Icons.home_rounded,
         'title': 'Home',
         'onTap': () {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/home',
-                (route) => false,
-            arguments: widget.loginResponseModel,
-          );
+          // Just close the drawer, user is already on home
+          Navigator.of(context).pop();
         },
       },
       {
         'icon': Icons.person_outline_rounded,
         'title': 'Profile',
         'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ProfileScreen()),
-          );
+          _navigateInCurrentTab(ProfileScreen());
         },
       },
       {
         'icon': Icons.lock_outline_rounded,
         'title': 'Change Pin',
         'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ChangePin()),
+          _navigateInCurrentTab(ChangePin());
+        },
+      },
+      {
+        'icon': Icons.password,
+        'title': 'Change Password',
+        'onTap': () {
+          _navigateInCurrentTab(
+            ChangePassword(loginResponse: widget.loginResponseModel),
           );
         },
       },
-        {
-          'icon': Icons.password,
-          'title': 'Change Password',
-          'onTap': () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ChangePassword(loginResponse: widget.loginResponseModel)),
-            );
-          },
-        },
       if (userData.role == "student")
         {
-          'icon': Icons.payments_rounded,
-          'title': 'Pay School Fee',
+          'icon': Icons.verified_user_rounded,
+          'title': 'Verify Student',
           'onTap': () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => SchoolFeesScreen(
-              )),
-            );
+            _navigateInCurrentTab(VerifyStudentScreen(loginResponseModel: widget.loginResponseModel,));
           },
         },
-
       {
         'icon': Icons.logout_rounded,
         'title': 'Logout',
@@ -508,5 +509,4 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
       ),
     );
   }
-
 }
