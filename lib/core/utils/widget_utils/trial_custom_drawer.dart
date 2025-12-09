@@ -422,7 +422,7 @@ class _TrialCustomDrawerState extends State<TrialCustomDrawer> with TickerProvid
           );
         },
       },
-      if (userData.role == "student")
+      if (userData.role == "vendor")
         {
           'icon': Icons.verified_user_rounded,
           'title': 'Verify Student',

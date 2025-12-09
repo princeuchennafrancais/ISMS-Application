@@ -37,22 +37,18 @@ class PaymentProcessingScreen extends StatefulWidget {
 class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with TickerProviderStateMixin {
   // Payment state
   bool isLoading = false;
-  bool isPolling = false;
-  bool paymentSuccessful = false;
+  bool isCheckingPayment = false;
+  bool paymentFound = false;
   String? errorMessage;
 
   // Payment data
   Map<String, dynamic>? paymentInitData;
   List<Map<String, dynamic>>? paymentItems;
-  Map<String, dynamic>? successfulTransaction;
-
-  // Timer for polling
-  Timer? _pollingTimer;
+  Map<String, dynamic>? foundTransaction;
 
   // Animation controllers
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  late AnimationController _successAnimationController;
 
   // Colors
   final Color primaryColor = AppColors.primaryBlue;
@@ -68,19 +64,12 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
   @override
   void dispose() {
     _animationController.dispose();
-    _successAnimationController.dispose();
-    _stopPolling();
     super.dispose();
   }
 
   void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _successAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
@@ -142,9 +131,6 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
             isLoading = false;
           });
 
-          // Start polling for payment status
-          _startPolling();
-
           print("✅ Payment initiated successfully");
         } else {
           setState(() {
@@ -175,42 +161,19 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
     }
   }
 
-  void _startPolling() {
+  Future<void> _checkForPayment() async {
     setState(() {
-      isPolling = true;
+      isCheckingPayment = true;
+      errorMessage = null;
     });
 
-    // Start polling immediately
-    _checkPaymentStatus();
-
-    // Then poll every 10 seconds
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _checkPaymentStatus();
-    });
-  }
-
-  void _stopPolling() {
-    if (_pollingTimer != null) {
-      _pollingTimer!.cancel();
-      _pollingTimer = null;
-    }
-    setState(() {
-      isPolling = false;
-    });
-  }
-
-  Future<void> _checkPaymentStatus() async {
     try {
-      print("🔄 Checking payment status...");
+      print("🔄 Checking for payment...");
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
 
-      final response = await http.get(
+      final response = await http.post(
         Uri.parse("https://rosarycollegenise.com/api/transaction_api/getStudenTxt"),
         headers: {
           'Content-Type': 'application/json',
@@ -227,8 +190,8 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
         if (responseData['status'] == 1) {
           final List<dynamic> transactions = responseData['data'] ?? [];
 
-          // Find recent transactions (within last 1 minute)
-          final DateTime oneMinuteAgo = DateTime.now().subtract(const Duration(minutes: 1));
+          // Find recent transactions (within last 2 minutes)
+          final DateTime twoMinutesAgo = DateTime.now().subtract(const Duration(minutes: 2));
 
           for (var studentData in transactions) {
             if (studentData['txt'] != null && studentData['txt'] is List) {
@@ -240,18 +203,15 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
 
                   final DateTime receivedAt = DateTime.parse(transaction['received_at']);
 
-                  if (receivedAt.isAfter(oneMinuteAgo)) {
-                    // Found a successful transaction from the last minute
-                    _stopPolling();
-
+                  if (receivedAt.isAfter(twoMinutesAgo)) {
+                    // Found a successful transaction from the last 2 minutes
                     setState(() {
-                      paymentSuccessful = true;
-                      successfulTransaction = Map<String, dynamic>.from(transaction);
+                      paymentFound = true;
+                      foundTransaction = Map<String, dynamic>.from(transaction);
+                      isCheckingPayment = false;
                     });
 
-                    _successAnimationController.forward();
-
-                    print("✅ Payment detected: ${transaction['amount_paid']} at ${transaction['received_at']}");
+                    print("✅ Payment found: ${transaction['amount_paid']} at ${transaction['received_at']}");
                     return;
                   }
                 }
@@ -259,22 +219,52 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> with 
             }
           }
 
-          print("⏳ No recent successful transactions found");
+          // No transaction found
+          setState(() {
+            paymentFound = false;
+            isCheckingPayment = false;
+          });
+
+          // Show message that no payment was found
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No recent payment found. Please make sure you\'ve transferred the amount to the account details above.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+
+          print("⚠️ No recent successful transactions found");
         } else {
+          setState(() {
+            errorMessage = responseData['message'] ?? 'Failed to check payment status';
+            isCheckingPayment = false;
+          });
           print("⚠️ Status check failed: ${responseData['message']}");
         }
       } else {
+        setState(() {
+          errorMessage = "Server error: ${response.statusCode}";
+          isCheckingPayment = false;
+        });
         print("⚠️ Status check HTTP error: ${response.statusCode}");
       }
     } on TimeoutException {
+      setState(() {
+        errorMessage = "Request timeout. Please try again";
+        isCheckingPayment = false;
+      });
       print("⚠️ Status check timeout");
     } on Exception catch (e) {
+      setState(() {
+        errorMessage = "Failed to check payment: ${e.toString()}";
+        isCheckingPayment = false;
+      });
       print("⚠️ Status check error: $e");
     }
   }
 
   void _cancelPayment() {
-    _stopPolling();
     Navigator.pop(context);
   }
 
@@ -450,6 +440,13 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
   }
 
   PreferredSizeWidget _buildAppBar() {
+    String appBarTitle = 'Make Payment';
+    if (isLoading) {
+      appBarTitle = 'Setting up Payment';
+    } else if (paymentFound) {
+      appBarTitle = 'Payment Found';
+    }
+
     return PreferredSize(
       preferredSize: Size.fromHeight(70.h),
       child: Container(
@@ -473,9 +470,9 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
         child: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: Container(), // Empty container to remove back arrow
+          leading: Container(),
           title: Text(
-            paymentSuccessful ? 'Payment Successful' : 'Make Payment',
+            appBarTitle,
             style: TextStyle(
               color: Colors.white,
               fontSize: 20.sp,
@@ -632,182 +629,7 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Account Information Card
-        Container(
-          padding: EdgeInsets.all(20.w),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                primaryColor.withOpacity(0.1),
-                primaryColor.withOpacity(0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20.r),
-            border: Border.all(
-              color: primaryColor.withOpacity(0.2),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Icon(
-                      Icons.account_balance_outlined,
-                      color: primaryColor,
-                      size: 22.sp,
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Text(
-                    'Account Information',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20.h),
-              _buildDetailRow('Bank Name', paymentInitData!['bank_name'] ?? 'N/A'),
-              SizedBox(height: 12.h),
-              _buildDetailRow('Account Name', paymentInitData!['account_name'] ?? 'N/A'),
-              SizedBox(height: 12.h),
-              _buildDetailRow(
-                'Account Number',
-                paymentInitData!['account_number'] ?? 'N/A',
-                isImportant: true,
-              ),
-              // Copy and Share Buttons
-              SizedBox(height: 20.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 45.h,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            final details = '''
-Bank: ${paymentInitData!['bank_name']}
-Account Name: ${paymentInitData!['account_name']}
-Account Number: ${paymentInitData!['account_number']}                            ''';
-                            _copyToClipboard(details);
-                          },
-                          borderRadius: BorderRadius.circular(12.r),
-                          child: Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.copy_all_rounded,
-                                  color: primaryColor,
-                                  size: 18.sp,
-                                ),
-                                SizedBox(width: 8.w),
-                                Text(
-                                  'Copy Details',
-                                  style: TextStyle(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: primaryColor,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Container(
-                      height: 45.h,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12.r),
-                        gradient: LinearGradient(
-                          colors: [
-                            primaryColor,
-                            primaryColor.withOpacity(0.8),
-                          ],
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            final bankName = paymentInitData!['bank_name'] ?? '';
-                            final accountName = paymentInitData!['account_name'] ?? '';
-                            final accountNumber = paymentInitData!['account_number'] ?? '';
-                            final reference = paymentInitData!['reference'] ?? '';
-                            final totalAmount = _calculateTotalAmount();
 
-                            final message = '''
-SCHOOL FEES PAYMENT DETAILS
-
-Bank: $bankName
-Account Name: $accountName
-Account Number: $accountNumber
-Amount: ₦$totalAmount
-
-ITEMS TO PAY:
-${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").join('\n')}
-                            ''';
-                            _showShareOptions(message);
-                          },
-                          borderRadius: BorderRadius.circular(12.r),
-                          child: Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.share_rounded,
-                                  color: Colors.white,
-                                  size: 18.sp,
-                                ),
-                                SizedBox(width: 8.w),
-                                Text(
-                                  'Share',
-                                  style: TextStyle(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 25.h),
 
         // Items Breakdown
         Text(
@@ -964,8 +786,243 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
 
         SizedBox(height: 30.h),
 
-        // Polling Status
-        if (isPolling) _buildPollingStatus(),
+        // Account Information Card
+        Container(
+          padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primaryColor.withOpacity(0.1),
+                primaryColor.withOpacity(0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20.r),
+            border: Border.all(
+              color: primaryColor.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_outlined,
+                      color: primaryColor,
+                      size: 22.sp,
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    'Account Information',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20.h),
+              _buildDetailRow('Bank Name', paymentInitData!['bank_name'] ?? 'N/A'),
+              SizedBox(height: 12.h),
+              _buildDetailRow('Account Name', paymentInitData!['account_name'] ?? 'N/A'),
+              SizedBox(height: 12.h),
+              _buildDetailRow(
+                'Account Number',
+                paymentInitData!['account_number'] ?? 'N/A',
+                isImportant: true,
+              ),
+              // Copy and Share Buttons
+              SizedBox(height: 20.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 45.h,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            final details = '''
+Bank: ${paymentInitData!['bank_name']}
+Account Name: ${paymentInitData!['account_name']}
+Account Number: ${paymentInitData!['account_number']}                            ''';
+                            _copyToClipboard(details);
+                          },
+                          borderRadius: BorderRadius.circular(12.r),
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.copy_all_rounded,
+                                  color: primaryColor,
+                                  size: 18.sp,
+                                ),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  'Copy Details',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: primaryColor,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Container(
+                      height: 45.h,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.r),
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor,
+                            primaryColor.withOpacity(0.8),
+                          ],
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            final bankName = paymentInitData!['bank_name'] ?? '';
+                            final accountName = paymentInitData!['account_name'] ?? '';
+                            final accountNumber = paymentInitData!['account_number'] ?? '';
+                            final reference = paymentInitData!['reference'] ?? '';
+                            final totalAmount = _calculateTotalAmount();
+
+                            final message = '''
+SCHOOL FEES PAYMENT DETAILS
+
+Bank: $bankName
+Account Name: $accountName
+Account Number: $accountNumber
+Amount: ₦$totalAmount
+
+ITEMS TO PAY:
+${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").join('\n')}
+                            ''';
+                            _showShareOptions(message);
+                          },
+                          borderRadius: BorderRadius.circular(12.r),
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.share_rounded,
+                                  color: Colors.white,
+                                  size: 18.sp,
+                                ),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  'Share',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(height: 25.h),
+
+        // I Have Made Payment Button
+        Container(
+          width: double.infinity,
+          height: 56.h,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16.r),
+            gradient: LinearGradient(
+              colors: [
+                primaryColor,
+                primaryColor.withOpacity(0.8),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isCheckingPayment ? null : _checkForPayment,
+              borderRadius: BorderRadius.circular(16.r),
+              child: Center(
+                child: isCheckingPayment
+                    ? SizedBox(
+                  width: 24.w,
+                  height: 24.h,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: Colors.white,
+                  ),
+                )
+                    : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: Colors.white,
+                      size: 22.sp,
+                    ),
+                    SizedBox(width: 12.w),
+                    Text(
+                      'I Have Made Payment',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
 
         // Cancel Button
         SizedBox(height: 20.h),
@@ -1067,245 +1124,233 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
     );
   }
 
-  Widget _buildPollingStatus() {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
-      ),
-      child: Row(
+  Widget _buildFoundPaymentScreen() {
+    if (foundTransaction == null) return Container();
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(30.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Payment Found Header
           Container(
-            width: 40.w,
-            height: 40.h,
+            padding: EdgeInsets.all(20.w),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: SizedBox(
-                width: 20.w,
-                height: 20.h,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.blue,
-                ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  successColor.withOpacity(0.1),
+                  successColor.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                color: successColor.withOpacity(0.2),
+                width: 1.5,
               ),
             ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  'Waiting for Payment',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue[800],
-                    fontFamily: 'Poppins',
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    color: successColor,
+                    size: 30.sp,
                   ),
                 ),
-                SizedBox(height: 4.h),
-                Text(
-                  'Please transfer the total amount to the account above. '
-                      'We\'ll notify you once payment is confirmed.',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.blue[700],
-                    fontFamily: 'Poppins',
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payment Found!',
+                        style: TextStyle(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'We have detected your payment',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Colors.grey[600],
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSuccessScreen() {
-    if (successfulTransaction == null) return Container();
+          SizedBox(height: 30.h),
 
-    return FadeTransition(
-      opacity: _successAnimationController,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(30.w),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ScaleTransition(
-                scale: Tween<double>(
-                  begin: 0.0,
-                  end: 1.0,
-                ).animate(
-                  CurvedAnimation(
-                    parent: _successAnimationController,
-                    curve: Curves.elasticOut,
-                  ),
+          // Transaction Details Card
+          Container(
+            padding: EdgeInsets.all(20.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-                child: Container(
-                  width: 120.w,
-                  height: 120.h,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        successColor.withOpacity(0.2),
-                        successColor.withOpacity(0.1),
-                      ],
-                    ),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: successColor.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    color: successColor,
-                    size: 60.sp,
-                  ),
-                ),
-              ),
-              SizedBox(height: 30.h),
-              Text(
-                'Payment Successful!',
-                style: TextStyle(
-                  fontSize: 28.sp,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Your payment has been confirmed successfully',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  color: Colors.grey[600],
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              SizedBox(height: 40.h),
-
-              // Transaction Details Card
-              Container(
-                padding: EdgeInsets.all(20.w),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      successColor.withOpacity(0.1),
-                      successColor.withOpacity(0.05),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20.r),
-                  border: Border.all(
-                    color: successColor.withOpacity(0.2),
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8.w),
-                          decoration: BoxDecoration(
-                            color: successColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10.r),
-                          ),
-                          child: Icon(
-                            Icons.receipt_long_rounded,
-                            color: successColor,
-                            size: 22.sp,
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Text(
-                          'Transaction Details',
-                          style: TextStyle(
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ],
+                    Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: successColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Icon(
+                        Icons.receipt_long_rounded,
+                        color: successColor,
+                        size: 22.sp,
+                      ),
                     ),
-                    SizedBox(height: 20.h),
-                    _buildSuccessDetailRow('Amount Paid', '₦${successfulTransaction!['amount_paid'] ?? '0.00'}'),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('Resolved Amount', '₦${successfulTransaction!['amount_resolved'] ?? '0.00'}'),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('From Account', '${successfulTransaction!['src_account_name']} (${successfulTransaction!['src_account_number']})'),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('From Bank', successfulTransaction!['src_bank_name'] ?? 'N/A'),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('Reference', successfulTransaction!['main_reference'] ?? 'N/A'),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('Date & Time', _formatDateTime(successfulTransaction!['received_at'])),
-                    SizedBox(height: 12.h),
-                    _buildSuccessDetailRow('Status', successfulTransaction!['status']?.toString().toUpperCase() ?? 'SUCCESSFUL'),
+                    SizedBox(width: 12.w),
+                    Text(
+                      'Transaction Details',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
                   ],
+                ),
+                SizedBox(height: 20.h),
+                _buildTransactionDetailRow('Amount Paid', '₦${foundTransaction!['amount_paid'] ?? '0.00'}'),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('Resolved Amount', '₦${foundTransaction!['amount_resolved'] ?? '0.00'}'),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('From Account', '${foundTransaction!['src_account_name']} (${foundTransaction!['src_account_number']})'),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('From Bank', foundTransaction!['src_bank_name'] ?? 'N/A'),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('Reference', foundTransaction!['main_reference'] ?? 'N/A'),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('Date & Time', _formatDateTime(foundTransaction!['received_at'])),
+                SizedBox(height: 12.h),
+                _buildTransactionDetailRow('Status', foundTransaction!['status']?.toString().toUpperCase() ?? 'SUCCESSFUL'),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 30.h),
+
+          // Action Buttons
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 56.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        final details = '''
+Payment Details:
+Amount Paid: ${foundTransaction!['amount_paid']}
+From: ${foundTransaction!['src_account_name']} (${foundTransaction!['src_account_number']})
+Bank: ${foundTransaction!['src_bank_name']}
+Reference: ${foundTransaction!['main_reference']}
+Date: ${_formatDateTime(foundTransaction!['received_at'])}
+                        ''';
+                        _copyToClipboard(details);
+                      },
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.copy_all_rounded,
+                              color: primaryColor,
+                              size: 18.sp,
+                            ),
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Copy Details',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: primaryColor,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-
-              SizedBox(height: 40.h),
-
-              // Back Button
-              Container(
-                width: double.infinity,
-                height: 56.h,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16.r),
-                  gradient: LinearGradient(
-                    colors: [
-                      primaryColor,
-                      primaryColor.withOpacity(0.8),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Container(
+                  height: 56.h,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.r),
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor,
+                        primaryColor.withOpacity(0.8),
+                      ],
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _goBackToFeesScreen,
-                    borderRadius: BorderRadius.circular(16.r),
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.arrow_back_rounded,
-                            color: Colors.white,
-                            size: 22.sp,
-                          ),
-                          SizedBox(width: 12.w),
-                          Text(
-                            'Back to School Fees',
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w600,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _goBackToFeesScreen,
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_back_rounded,
                               color: Colors.white,
-                              fontFamily: 'Poppins',
+                              size: 18.sp,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Back to Fees',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1313,12 +1358,12 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildSuccessDetailRow(String label, String value) {
+  Widget _buildTransactionDetailRow(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1398,7 +1443,7 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
         opacity: _fadeAnimation,
         child: Stack(
           children: [
-            if (!paymentSuccessful)
+            if (!paymentFound)
               SingleChildScrollView(
                 padding: EdgeInsets.all(30.w),
                 child: Column(
@@ -1415,8 +1460,8 @@ ${paymentItems?.map((item) => "- ${item['component']}: ₦${item['amount']}").jo
                 ),
               ),
 
-            if (paymentSuccessful)
-              _buildSuccessScreen(),
+            if (paymentFound)
+              _buildFoundPaymentScreen(),
           ],
         ),
       ),
