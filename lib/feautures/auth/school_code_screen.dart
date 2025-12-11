@@ -463,7 +463,6 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
 
                       SizedBox(height: 40.h),
 
-                      // Header
                       FadeTransition(
                         opacity: _fadeAnimation,
                         child: Column(
@@ -523,7 +522,6 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
 
                       SizedBox(height: 50.h),
 
-                      // Code Input Section with Pinput
                       FadeTransition(
                         opacity: _fadeAnimation,
                         child: SlideTransition(
@@ -624,7 +622,6 @@ class _SchoolCodeScreenState extends State<SchoolCodeScreen>
 
                       SizedBox(height: 40.h),
 
-                      // Features Section
                       FadeTransition(
                         opacity: _fadeAnimation,
                         child: Container(

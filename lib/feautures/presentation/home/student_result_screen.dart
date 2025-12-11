@@ -1199,7 +1199,6 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
         !isLoadingClassArms;
   }
 
-  // [Keep all existing API methods unchanged from here...]
   Future<void> fetchResults({
     required String session,
     required String classId,
@@ -1209,8 +1208,7 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
   }) async {
     try {
       print("🔄 Attempting to fetch results");
-      print("📝 Session: $session");
-      print("📝 Term: $term");
+      print("📝 Session: $session, Class: $classId, Arm: $classArm, Term: $term");
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
@@ -1220,13 +1218,13 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
       Map<String, dynamic> requestBody;
 
       if (term == '4') { // Annual term
-        endpoint = "https://rosarycollegenise.com/api/result_api/getAnnualresult";
+        endpoint = "https://api.ceemact.com/result_api/getAnnualresult";
         requestBody = {
           'session': session,
         };
         print("📌 Using Annual Result Endpoint");
       } else {
-        endpoint = "https://rosarycollegenise.com/api/result_api/getTermresult";
+        endpoint = "https://api.ceemact.com/result_api/getTermresult";
         requestBody = {
           'session': session,
           'class_id': classId,
@@ -1237,6 +1235,7 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
       }
 
       print("📤 Request body: ${jsonEncode(requestBody)}");
+      print("📤 School Code: $schoolCode");
 
       final response = await http.post(
         Uri.parse(endpoint),
@@ -1244,6 +1243,7 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
+          'scode': schoolCode ?? "", // Added scode header
         },
         body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 30));
@@ -1253,38 +1253,174 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
 
       if (response.statusCode == 200) {
         String responseBody = response.body.trim();
-        int jsonStartIndex = responseBody.indexOf('{');
 
-        if (jsonStartIndex != -1) {
-          String jsonString = responseBody.substring(jsonStartIndex);
-          final responseData = jsonDecode(jsonString);
+        // Handle the malformed response with two JSON objects
+        try {
+          // Find the first complete JSON object
+          int firstBraceIndex = responseBody.indexOf('{');
+          int braceCount = 0;
+          int endIndex = firstBraceIndex;
 
-          print("🔍 Response keys: ${responseData.keys.toList()}");
-          print("🔍 Status value: ${responseData['status']}");
+          for (int i = firstBraceIndex; i < responseBody.length; i++) {
+            if (responseBody[i] == '{') {
+              braceCount++;
+            } else if (responseBody[i] == '}') {
+              braceCount--;
+              if (braceCount == 0) {
+                endIndex = i;
+                break;
+              }
+            }
+          }
 
-          if (responseData['status'] == 1) {
+          String validJsonString = responseBody.substring(firstBraceIndex, endIndex + 1);
+          print("✅ Extracted Result JSON: $validJsonString");
+
+          final responseData = jsonDecode(validJsonString);
+
+          // Check if this is the direct format or nested in payload
+          Map<String, dynamic> resultData;
+          if (responseData.containsKey('payload')) {
+            // Format: Contains 'payload'
+            if (responseData['payload'] != null) {
+              resultData = responseData['payload'];
+            } else {
+              throw Exception("Result payload is null");
+            }
+          } else {
+            // Format: Direct structure
+            resultData = responseData;
+          }
+
+          print("🔍 Result Data keys: ${resultData.keys.toList()}");
+          print("🔍 Result Data status: ${resultData['status']}");
+          print("🔍 Result Data message: ${resultData['message']}");
+          print("🔍 Result Data url: ${resultData['url']}");
+          print("🔍 Result Data data type: ${resultData['data'].runtimeType}");
+          print("🔍 Result Data data: ${resultData['data']}");
+
+          if (resultData['status'] == 1) {
             try {
               // Handle Annual Result
               if (term == '4') {
-                AnnualResultResponse annualResponse = AnnualResultResponse.fromJson(responseData);
+                // Create data structure that matches your AnnualResultData model
+                final apiData = resultData['data'] as Map<String, dynamic>? ?? {};
 
-                if (context.mounted) {
-                  _showSuccessSnackbar(responseData['message'] ?? 'Annual results fetched successfully');
+                // Transform the API data to match your model structure
+                Map<String, dynamic> transformedData = {
+                  'ok': apiData['ok']?.toString() ?? 'true',
+                  'session': apiData['session']?.toString() ?? '',
+                  'student': apiData['student']?.toString() ?? '',
+                  'classm': apiData['classm']?.toString() ?? '',
+                  'classarm': apiData['classarm']?.toString() ?? '',
+                  'overall': apiData['overall'] ?? {}, // This might be null in API response
+                  'subjects': apiData['subjects'] ?? [], // This is empty array in API response
+                };
 
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ViewAnnualResultScreen(
-                        annualResultResponse: annualResponse,
-                      ),
-                    ),
-                  );
+                // Log transformed data
+                print("📋 Transformed annual data: $transformedData");
+
+                // Check if overall is null and provide default
+                if (transformedData['overall'] == null) {
+                  transformedData['overall'] = {
+                    'classm': '',
+                    'classarm': '',
+                    'total': 0.0,
+                    'avgm': 0.0,
+                    'position': ''
+                  };
                 }
+
+                // Build the full annual result response
+                Map<String, dynamic> annualResponseData = {
+                  'status': resultData['status'] ?? 0,
+                  'message': resultData['message'] ?? '',
+                  'url': resultData['url'] ?? '',
+                  'data': transformedData,
+                };
+
+                print("📋 Final annual response data: $annualResponseData");
+
+                try {
+                  // Parse with your AnnualResultResponse model
+                  AnnualResultResponse annualResponse = AnnualResultResponse.fromJson(annualResponseData);
+
+                  if (context.mounted) {
+                    _showSuccessSnackbar(resultData['message'] ?? 'Annual results fetched successfully');
+                    print("✅ Annual results parsed successfully");
+                    print("📋 Annual URL: ${annualResponse.url}");
+                    print("📋 Student: ${annualResponse.data.student}");
+                    print("📋 Subjects count: ${annualResponse.data.subjects.length}");
+
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ViewAnnualResultScreen(
+                          annualResultResponse: annualResponse,
+                        ),
+                      ),
+                    );
+                  }
+                } catch (parseError) {
+                  print("❌ Error parsing annual response: $parseError");
+                  print("❌ Data that failed: $annualResponseData");
+
+                  // Fallback: Create a minimal valid response
+                  Map<String, dynamic> fallbackData = {
+                    'ok': 'true',
+                    'session': apiData['session']?.toString() ?? session,
+                    'student': apiData['student']?.toString() ?? 'Unknown',
+                    'classm': apiData['classm']?.toString() ?? '',
+                    'classarm': apiData['classarm']?.toString() ?? '',
+                    'overall': {
+                      'classm': '',
+                      'classarm': '',
+                      'total': 0.0,
+                      'avgm': 0.0,
+                      'position': ''
+                    },
+                    'subjects': [],
+                  };
+
+                  AnnualResultResponse fallbackResponse = AnnualResultResponse(
+                    status: resultData['status'] ?? 0,
+                    message: resultData['message'] ?? '',
+                    url: resultData['url'] ?? '',
+                    data: AnnualResultData.fromJson(fallbackData),
+                  );
+
+                  if (context.mounted) {
+                    _showSuccessSnackbar("Annual results loaded (some data may be incomplete)");
+
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ViewAnnualResultScreen(
+                          annualResultResponse: fallbackResponse,
+                        ),
+                      ),
+                    );
+                  }
+                }
+
               } else {
-                // Handle Term Result (existing logic)
-                ResultResponse resultResponse = ResultResponse.fromJson(responseData);
+                // Handle Term Result
+                Map<String, dynamic> termData = {
+                  'status': resultData['status'] ?? 0,
+                  'message': resultData['message'] ?? '',
+                  'url': resultData['url'] ?? '',
+                  'data': resultData['data'] ?? {},
+                };
+
+                print("📋 Term data for parsing: ${termData['data']}");
+
+                // Parse with your existing ResultResponse model
+                ResultResponse resultResponse = ResultResponse.fromJson(termData);
 
                 if (context.mounted) {
-                  _showSuccessSnackbar(responseData['message'] ?? 'Results fetched successfully');
+                  _showSuccessSnackbar(resultData['message'] ?? 'Results fetched successfully');
+                  print("✅ Term results parsed successfully");
+                  print("📋 Student name: ${resultResponse.data.student.fullName}");
+                  print("📋 Number of subjects: ${resultResponse.data.results.length}");
+                  print("📋 Download URL: ${resultResponse.url}");
 
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -1296,19 +1432,24 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
                 }
               }
             } catch (e) {
-              print("❌ Error parsing result response: $e");
+              print("❌ Error in result processing: $e");
+              print("❌ Stack trace: ${e.toString()}");
               if (context.mounted) {
-                _showErrorSnackbar("Error processing results data");
+                _showErrorSnackbar("Error processing results data: ${e.toString()}");
               }
             }
           } else {
-            print("❌ API returned error status: ${responseData['status']}");
+            print("❌ API returned error status: ${resultData['status']}");
             if (context.mounted) {
-              _showErrorSnackbar(responseData['message'] ?? 'Failed to fetch results');
+              _showErrorSnackbar(resultData['message'] ?? 'Failed to fetch results');
             }
           }
-        } else {
-          throw FormatException("No valid JSON found in response");
+        } catch (e) {
+          print("❌ JSON Parse Error: $e");
+          print("❌ Full response: $responseBody");
+          if (context.mounted) {
+            _showErrorSnackbar("Failed to parse server response. Please try again.");
+          }
         }
       } else {
         print("❌ HTTP Error: ${response.statusCode}");
@@ -1347,198 +1488,6 @@ class _StudentResultScreenState extends State<StudentResultScreen> with TickerPr
       });
     }
   }
-
-  Future<void> _downloadPDF(String fileUrl) async {
-    try {
-      print("📥 Starting PDF download from: $fileUrl");
-
-      if (!_hasStoragePermission) {
-        await _checkPermissions();
-        if (!_hasStoragePermission) {
-          _showErrorSnackbar("Storage permission is required to download files");
-          return;
-        }
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token') ?? '';
-
-      // Clean up the URL - remove double slashes
-      String cleanUrl = fileUrl.replaceAll('//ceeinc/', '/ceeinc/');
-      print("🔧 Cleaned URL: $cleanUrl");
-
-      // Try multiple download strategies
-      http.Response? response;
-
-      // Strategy 1: Try with full authentication headers (like your API calls)
-      try {
-        print("🔄 Trying Strategy 1: Full authentication headers...");
-        response = await http.get(
-          Uri.parse(cleanUrl),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/pdf, */*',
-            'scode': schoolCode ?? "",
-            'User-Agent': 'Flutter App',
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
-        ).timeout(const Duration(seconds: 60));
-
-        print("📥 Strategy 1 Response Status: ${response.statusCode}");
-      } catch (e) {
-        print("❌ Strategy 1 failed: $e");
-      }
-
-      // Strategy 2: If Strategy 1 fails, try POST request (some APIs require POST for file downloads)
-      if (response == null || response.statusCode != 200) {
-        try {
-          print("🔄 Trying Strategy 2: POST request...");
-
-          // Extract filename from URL for POST body
-          final uri = Uri.parse(cleanUrl);
-          final pathSegments = uri.pathSegments;
-          final filename = pathSegments.isNotEmpty ? pathSegments.last : '';
-
-          final Map<String, dynamic> requestBody = {
-            'file_url': cleanUrl,
-            'filename': filename,
-          };
-
-          response = await http.post(
-            Uri.parse("${baseUrl}result_api/downloadResult"), // You might need to adjust this endpoint
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/pdf, */*',
-              'scode': schoolCode ?? "",
-            },
-            body: jsonEncode(requestBody),
-          ).timeout(const Duration(seconds: 60));
-
-          print("📥 Strategy 2 Response Status: ${response.statusCode}");
-        } catch (e) {
-          print("❌ Strategy 2 failed: $e");
-        }
-      }
-
-      // Strategy 3: Try with session cookies (if the server uses session-based auth)
-      if (response == null || response.statusCode != 200) {
-        try {
-          print("🔄 Trying Strategy 3: With cookies...");
-          response = await http.get(
-            Uri.parse(cleanUrl),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/pdf, */*',
-              'scode': schoolCode ?? "",
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36',
-              'Referer': baseUrl,
-              'Cookie': 'auth_token=$token; scode=${schoolCode ?? ""}',
-            },
-          ).timeout(const Duration(seconds: 60));
-
-          print("📥 Strategy 3 Response Status: ${response.statusCode}");
-        } catch (e) {
-          print("❌ Strategy 3 failed: $e");
-        }
-      }
-
-      // Strategy 4: Try the original URL (without cleaning)
-      if (response == null || response.statusCode != 200) {
-        try {
-          print("🔄 Trying Strategy 4: Original URL...");
-          response = await http.get(
-            Uri.parse(fileUrl), // Original URL
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/pdf, */*',
-              'scode': schoolCode ?? "",
-            },
-          ).timeout(const Duration(seconds: 60));
-
-          print("📥 Strategy 4 Response Status: ${response.statusCode}");
-        } catch (e) {
-          print("❌ Strategy 4 failed: $e");
-        }
-      }
-
-      // Check if any strategy worked
-      if (response != null && response.statusCode == 200) {
-        // Check if response is actually a PDF
-        final contentType = response.headers['content-type'] ?? '';
-        print("📋 Content-Type: $contentType");
-
-        if (contentType.contains('application/pdf') || response.bodyBytes.length > 1000) {
-          final downloadPath = await _getDownloadsDirectoryPath();
-          print('📁 Using download path: $downloadPath');
-
-          final timestamp = DateTime.now().millisecondsSinceEpoch;
-          final fileName = 'student_result_$timestamp.pdf';
-          final filePath = '$downloadPath/$fileName';
-
-          final file = File(filePath);
-          await file.writeAsBytes(response.bodyBytes);
-
-          print("✅ PDF downloaded successfully to: $filePath");
-
-          if (mounted) {
-            setState(() {
-              _lastDownloadedFile = filePath;
-            });
-
-            _showSuccessSnackbar("Result downloaded successfully!");
-          }
-
-          // Open file immediately after download
-          await _openDownloadedFile();
-        } else {
-          print("❌ Response is not a PDF file");
-          print("📄 Response content: ${response.body.substring(0, 500)}...");
-          _showErrorSnackbar("Server returned invalid file format");
-        }
-      } else {
-        print("❌ All download strategies failed");
-        print("📥 Final response status: ${response?.statusCode}");
-        print("📄 Final response body: ${response?.body}");
-
-        // Show specific error message based on status code
-        if (response?.statusCode == 403) {
-          _showErrorSnackbar("Access denied. The file may have expired or you don't have permission to download it.");
-        } else if (response?.statusCode == 404) {
-          _showErrorSnackbar("File not found. Please generate a new result.");
-        } else {
-          _showErrorSnackbar("Failed to download file. Please try again later.");
-        }
-      }
-    } on TimeoutException catch (e) {
-      print("❌ Download timeout: $e");
-      if (mounted) {
-        _showErrorSnackbar("Download timeout. Please try again with a stable connection.");
-      }
-    } on SocketException catch (e) {
-      print("❌ Download network error: $e");
-      if (mounted) {
-        _showErrorSnackbar("Network error. Please check your internet connection.");
-      }
-    } catch (e) {
-      print("❌ Download error: $e");
-      if (mounted) {
-        String errorMessage = "Failed to download result";
-
-        if (e.toString().contains('Permission denied')) {
-          errorMessage = "Storage permission required. Please grant permission in app settings.";
-          await _checkPermissions();
-        } else if (e.toString().contains('No space left')) {
-          errorMessage = "Insufficient storage space";
-        }
-
-        _showErrorSnackbar("$errorMessage: ${e.toString()}");
-      }
-    }
-  }
-
   Future<String> _getDownloadsDirectoryPath() async {
     try {
       if (Platform.isAndroid) {
